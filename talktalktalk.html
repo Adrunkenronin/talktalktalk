@@ -825,9 +825,22 @@ function makeStockfishMove(bestmove) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ fen: position, depth: depth, elo: stockfishGame.elo })
         }).then(function(r){ return r.json(); }).then(function(resp){
-            if (resp && resp.bestmove) { makeStockfishMove(resp.bestmove); }
-        }).catch(function(){
-            $('#chess-status').text('Engine error');
+            if (!resp) {
+                $('#chess-status').text('Engine error: no response');
+                return;
+            }
+            if (resp.error) {
+                $('#chess-status').text('Engine error: ' + resp.error);
+                return;
+            }
+            if (resp.bestmove) {
+                makeStockfishMove(resp.bestmove);
+            } else {
+                $('#chess-status').text('Engine error: no move');
+            }
+        }).catch(function(err){
+            console.error('Stockfish API error:', err);
+            $('#chess-status').text('Engine error: connection failed');
         });
         return;
     }
