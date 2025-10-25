@@ -149,39 +149,56 @@ function evaluateBoardMaterial(chess) {
 }
 
 function bestMoveFallback(fen, depth) {
-  const chess = new ChessCtor();
-  try { chess.load(fen); } catch (_) { return null; }
-  const maxDepth = Math.max(1, Math.min(4, Number(depth) || 2));
-  const player = chess.turn();
-  function negamax(d, alpha, beta) {
-    if (d === 0 || chess.game_over()) {
-      const evalScore = evaluateBoardMaterial(chess);
-      return player === 'w' ? evalScore : -evalScore;
+  try {
+    const chess = new ChessCtor();
+    try { chess.load(fen); } catch (_) { return null; }
+    const maxDepth = Math.max(1, Math.min(3, Number(depth) || 2));
+    const player = chess.turn();
+    let callCount = 0;
+    const maxCalls = 50000;
+
+    function negamax(d, alpha, beta) {
+      callCount++;
+      if (callCount > maxCalls || d === 0 || chess.game_over()) {
+        const evalScore = evaluateBoardMaterial(chess);
+        return player === 'w' ? evalScore : -evalScore;
+      }
+      let best = -Infinity;
+      const moves = chess.moves({ verbose: true });
+      if (moves.length === 0) return player === 'w' ? -Infinity : Infinity;
+
+      for (const m of moves) {
+        chess.move(m);
+        const score = -negamax(d - 1, -beta, -alpha);
+        chess.undo();
+        if (score > best) best = score;
+        if (score > alpha) alpha = score;
+        if (alpha >= beta) break;
+      }
+      return best;
     }
-    let best = -Infinity;
+
+    let bestMove = null;
+    let bestScore = -Infinity;
     const moves = chess.moves({ verbose: true });
+    if (moves.length === 0) return null;
+
     for (const m of moves) {
       chess.move(m);
-      const score = -negamax(d - 1, -beta, -alpha);
+      const score = -negamax(maxDepth - 1, -Infinity, Infinity);
       chess.undo();
-      if (score > best) best = score;
-      if (score > alpha) alpha = score;
-      if (alpha >= beta) break;
+      if (score > bestScore) { bestScore = score; bestMove = m; }
     }
-    return best;
+
+    if (!bestMove) {
+      bestMove = moves[0];
+    }
+    const promo = bestMove.promotion ? bestMove.promotion : '';
+    return bestMove.from + bestMove.to + (promo || '');
+  } catch (e) {
+    console.error('Fallback move calculation error:', e);
+    return null;
   }
-  let bestMove = null;
-  let bestScore = -Infinity;
-  const moves = chess.moves({ verbose: true });
-  for (const m of moves) {
-    chess.move(m);
-    const score = -negamax(maxDepth - 1, -Infinity, Infinity);
-    chess.undo();
-    if (score > bestScore) { bestScore = score; bestMove = m; }
-  }
-  if (!bestMove) return null;
-  const promo = bestMove.promotion ? bestMove.promotion : '';
-  return bestMove.from + bestMove.to + (promo || '');
 }
 
 app.post('/api/stockfish/move', async (req, res) => {
