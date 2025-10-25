@@ -92,48 +92,61 @@ function eloToDepth(elo) {
 
 async function bestMoveWithStockfish(fen, depth) {
   if (!StockfishFactory) return null;
+
   return await new Promise((resolve) => {
     try {
       let engine = null;
       try {
         engine = StockfishFactory();
       } catch (e) {
+        console.error('Failed to create Stockfish engine:', e.message);
         resolve(null);
         return;
       }
+
       if (!engine) {
         resolve(null);
         return;
       }
 
       let resolved = false;
+      const timeoutMs = Math.min(5000, 500 + depth * 300);
       const timeout = setTimeout(() => {
         if (!resolved) {
           resolved = true;
-          try { if (engine && engine.postMessage) engine.postMessage('quit'); } catch(_){}
+          try {
+            if (engine && typeof engine.postMessage === 'function') {
+              engine.postMessage('quit');
+            }
+          } catch(_){}
           resolve(null);
         }
-      }, Math.min(10000, 1000 + depth * 1000));
+      }, timeoutMs);
 
       engine.onmessage = (ev) => {
         const line = (ev && (ev.data || ev)) || '';
         if (typeof line === 'string' && line.indexOf('bestmove') > -1) {
-          const bm = line.split(' ')[1];
+          const parts = line.split(' ');
+          const bm = parts[1] || null;
           if (!resolved) {
             resolved = true;
             clearTimeout(timeout);
-            try { if (engine && engine.postMessage) engine.postMessage('quit'); } catch(_){}
-            resolve(bm || null);
+            try {
+              if (engine && typeof engine.postMessage === 'function') {
+                engine.postMessage('quit');
+              }
+            } catch(_){}
+            resolve(bm);
           }
         }
       };
 
-      try { if (engine) engine.postMessage('uci'); } catch(_){}
-      try { if (engine) engine.postMessage('isready'); } catch(_){}
-      try { if (engine) engine.postMessage(`position fen ${fen}`); } catch(_){}
-      try { if (engine) engine.postMessage(`go depth ${Number(depth) || 8}`); } catch(_){}
+      try { if (engine && typeof engine.postMessage === 'function') engine.postMessage('uci'); } catch(_){}
+      try { if (engine && typeof engine.postMessage === 'function') engine.postMessage('isready'); } catch(_){}
+      try { if (engine && typeof engine.postMessage === 'function') engine.postMessage(`position fen ${fen}`); } catch(_){}
+      try { if (engine && typeof engine.postMessage === 'function') engine.postMessage(`go depth ${Number(depth) || 8}`); } catch(_){}
     } catch (e) {
-      console.error('Stockfish engine error:', e);
+      console.error('Stockfish engine error:', e.message);
       resolve(null);
     }
   });
