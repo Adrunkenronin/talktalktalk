@@ -202,18 +202,34 @@ function bestMoveFallback(fen, depth) {
 }
 
 app.post('/api/stockfish/move', async (req, res) => {
-  const fen = String(req.body && req.body.fen || '').trim();
-  let depth = Number(req.body && (req.body.depth ?? 0));
-  const elo = Number(req.body && (req.body.elo ?? 0));
-  if (!fen) return res.status(400).json({ error: 'fen required' });
-  if (!depth && elo) depth = eloToDepth(elo);
-  if (!depth) depth = 8;
   try {
-    let best = await bestMoveWithStockfish(fen, depth);
-    if (!best) best = bestMoveFallback(fen, depth);
+    const fen = String(req.body && req.body.fen || '').trim();
+    let depth = Number(req.body && (req.body.depth ?? 0));
+    const elo = Number(req.body && (req.body.elo ?? 0));
+    if (!fen) return res.status(400).json({ error: 'fen required' });
+    if (!depth && elo) depth = eloToDepth(elo);
+    if (!depth) depth = 8;
+    depth = Math.max(1, Math.min(20, depth));
+
+    let best = null;
+    try {
+      best = await bestMoveWithStockfish(fen, depth);
+    } catch (e) {
+      console.error('Stockfish move error:', e);
+    }
+
+    if (!best) {
+      try {
+        best = bestMoveFallback(fen, depth);
+      } catch (e) {
+        console.error('Fallback move error:', e);
+      }
+    }
+
     if (!best) return res.status(422).json({ error: 'no_move' });
     res.json({ bestmove: best });
   } catch (e) {
+    console.error('API stockfish/move error:', e);
     res.status(500).json({ error: 'engine_error' });
   }
 });
