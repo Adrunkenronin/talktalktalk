@@ -873,6 +873,264 @@ function handleStockfishMove(from, to, promotion) {
     return true;
 }
 
+function renderBoard() {
+    if (!chessGame) return;
+    var board = $('#chess-board');
+    board.empty();
+    if (pendingPromotion) {
+        hidePromotionDialog();
+    } else {
+        clearSelection();
+    }
+    dragSourceSquare = null;
+
+    var parts = chessGame.fen.split(' ');
+    var ranksFEN = parts[0].split('/');
+    var files = ['a','b','c','d','e','f','g','h'];
+    var mapPiece = { 'P':'wp','N':'wn','B':'wb','R':'wr','Q':'wq','K':'wk','p':'bp','n':'bn','b':'bb','r':'br','q':'bq','k':'bk' };
+    chessGame.squareMap = {};
+    for (var r = 0; r < 8; r++) {
+        var row = ranksFEN[r];
+        var fileIndex = 0;
+        for (var i = 0; i < row.length; i++) {
+            var ch = row[i];
+            if (/[1-8]/.test(ch)) {
+                fileIndex += parseInt(ch, 10);
+            } else {
+                var file = files[fileIndex];
+                var rank = 8 - r; // FEN rows start at rank 8
+                var sq = file + String(rank);
+                var pieceCode = mapPiece[ch] || null;
+                if (pieceCode) chessGame.squareMap[sq] = pieceCode;
+                fileIndex++;
+            }
+        }
+    }
+
+    function appendSquare(sq) {
+        var fIndex = sq.charCodeAt(0) - 97; // 'a' -> 0
+        var rNum = parseInt(sq.charAt(1), 10);
+        var light = ((fIndex + rNum) % 2) === 0;
+        var el = $('<div class="chess-square" />').addClass(light ? 'light' : 'dark').attr('data-square', sq);
+        var pieceCode = chessGame.squareMap[sq];
+        if (pieceCode) {
+            var pieceEl = $('<div/>').addClass('chess-piece').addClass('piece-' + pieceCode).attr('draggable', true).attr('data-square', sq).attr('data-piece', pieceCode);
+            el.append(pieceEl);
+        }
+        if (chessGame.lastMove && (sq === chessGame.lastMove.from || sq === chessGame.lastMove.to)) el.addClass('lastmove');
+        board.append(el);
+    }
+
+    var rankOrder = (chessGame.color === 'white') ? [8,7,6,5,4,3,2,1] : [1,2,3,4,5,6,7,8];
+    var fileOrder = (chessGame.color === 'white') ? files : files.slice().reverse();
+    for (var ri = 0; ri < rankOrder.length; ri++) {
+        for (var fi = 0; fi < fileOrder.length; fi++) {
+            appendSquare(fileOrder[fi] + String(rankOrder[ri]));
+        }
+    }
+
+    $('#chess-board .chess-square').removeClass('in-check');
+    if (chessGame.inCheck) {
+        var targetKing = (chessGame.turn === 'white') ? 'wk' : 'bk';
+        var kingSq = null;
+        for (var key in chessGame.squareMap) {
+            if (chessGame.squareMap[key] === targetKing) { kingSq = key; break; }
+        }
+        if (kingSq) {
+            $('#chess-board .chess-square[data-square="' + kingSq + '"]').addClass('in-check');
+        }
+    }
+}
+
+function squarePieceCode(sq) {
+    if (!chessGame || !chessGame.squareMap) return null;
+    return chessGame.squareMap[sq] || null;
+}
+
+function isPlayersPiece(pieceCode) {
+    if (!chessGame || !pieceCode) return false;
+    if (stockfishGame) {
+        var playerColorLetter = stockfishGame.color === 'w' ? 'w' : 'b';
+        return pieceCode.charAt(0) === playerColorLetter;
+    }
+    if (pieceCode.charAt(0) === 'w') return chessGame.color === 'white';
+    if (pieceCode.charAt(0) === 'b') return chessGame.color === 'black';
+    return false;
+}
+
+function clearSelection() {
+    selectedSquare = null;
+    $('#chess-board .chess-square').removeClass('selected');
+}
+
+function requiresPromotion(pieceCode, targetSquare) {
+    if (!pieceCode || pieceCode.charAt(1) !== 'p') return false;
+    var rank = parseInt(String(targetSquare).charAt(1), 10);
+    if (isNaN(rank)) return false;
+    if (pieceCode.charAt(0) === 'w') return rank === 8;
+    return rank === 1;
+}
+
+function openPromotionDialog(from, to, pieceCode) {
+    pendingPromotion = { from: from, to: to, color: pieceCode.charAt(0) };
+    var options = $('#promotion-options');
+    options.empty();
+    var prefix = pendingPromotion.color;
+    ['q','r','b','n'].forEach(function(symbol) {
+        var option = $('<button type="button" class="promotion-choice" />').attr('data-promotion', symbol);
+        option.append($('<div/>').addClass('promotion-piece').addClass('piece-' + prefix + symbol));
+        options.append(option);
+    });
+    $('#chess-board .chess-square').removeClass('selected');
+    $('#chess-board .chess-square[data-square="' + from + '"]').addClass('selected');
+    $('#chess-board .chess-square[data-square="' + to + '"]').addClass('selected');
+    selectedSquare = from;
+    $('#promotion-overlay').removeClass('hidden');
+}
+
+function hidePromotionDialog() {
+    pendingPromotion = null;
+    $('#promotion-overlay').addClass('hidden');
+    $('#promotion-options').empty();
+    clearSelection();
+}
+
+function sendMove(from, to, promotion) {
+    if (!chessGame) return;
+    if (stockfishGame) {
+        handleStockfishMove(from, to, promotion);
+        return;
+    }
+    if (!ws || ws.readyState !== 1) return;
+    var payload = { type: 'chess_move', game_id: chessGame.id, from: from, to: to };
+    if (promotion) payload.promotion = promotion;
+    ws.send(JSON.stringify(payload));
+    clearSelection();
+    $('#chess-board .chess-square').removeClass('drag-over');
+}
+
+function attemptMove(from, to) {
+    if (!chessGame || pendingPromotion) return;
+    var myTurn = chessGame.turn === chessGame.color;
+    if (!myTurn) {
+        flashStatus('Wait your turn');
+        return;
+    }
+    if (!from || !to || from === to) return;
+    var pieceCode = squarePieceCode(from);
+    if (!pieceCode) {
+        clearSelection();
+        return;
+    }
+    if (!isPlayersPiece(pieceCode)) {
+        flashStatus('Not your piece');
+        clearSelection();
+        return;
+    }
+    if (requiresPromotion(pieceCode, to)) {
+        openPromotionDialog(from, to, pieceCode);
+    } else {
+        sendMove(from, to, null);
+    }
+}
+
+function onSquareClick() {
+    if (!chessGame || pendingPromotion) return;
+    var sq = $(this).data('square');
+    var pieceCode = squarePieceCode(sq);
+    var myTurn = chessGame.turn === chessGame.color;
+    if (!selectedSquare) {
+        if (!pieceCode) return;
+        if (!myTurn) { flashStatus('Wait your turn'); return; }
+        if (!isPlayersPiece(pieceCode)) { flashStatus('Not your piece'); return; }
+        selectedSquare = sq;
+        $('#chess-board .chess-square').removeClass('selected');
+        $(this).addClass('selected');
+        return;
+    }
+    if (selectedSquare === sq) {
+        clearSelection();
+        return;
+    }
+    if (pieceCode && isPlayersPiece(pieceCode) && myTurn) {
+        selectedSquare = sq;
+        $('#chess-board .chess-square').removeClass('selected');
+        $(this).addClass('selected');
+        return;
+    }
+    attemptMove(selectedSquare, sq);
+}
+
+function onPieceDragStart(e) {
+    if (!chessGame || pendingPromotion) { e.preventDefault(); return; }
+    var parentSquare = $(this).parent().data('square');
+    var pieceCode = squarePieceCode(parentSquare);
+    if (!pieceCode) { e.preventDefault(); return; }
+    if (!isPlayersPiece(pieceCode)) { flashStatus('Not your piece'); e.preventDefault(); return; }
+    if (chessGame.turn !== chessGame.color) { flashStatus('Wait your turn'); e.preventDefault(); return; }
+    dragSourceSquare = parentSquare;
+    $('#chess-board .chess-square').removeClass('selected');
+    $('#chess-board .chess-square[data-square="' + parentSquare + '"]').addClass('selected');
+    selectedSquare = parentSquare;
+    $(this).addClass('dragging');
+    var dt = e.originalEvent && e.originalEvent.dataTransfer;
+    if (dt) {
+        dt.setData('text/plain', parentSquare);
+        dt.effectAllowed = 'move';
+    }
+}
+
+function onPieceDragEnd() {
+    $(this).removeClass('dragging');
+    dragSourceSquare = null;
+    clearSelection();
+    $('#chess-board .chess-square').removeClass('drag-over');
+}
+
+function onSquareDragOver(e) {
+    if (!dragSourceSquare) return;
+    e.preventDefault();
+    $(this).addClass('drag-over');
+}
+
+function onSquareDragLeave() {
+    $(this).removeClass('drag-over');
+}
+
+function onSquareDrop(e) {
+    if (!dragSourceSquare) return;
+    e.preventDefault();
+    var target = $(this).data('square');
+    $('#chess-board .chess-piece.dragging').removeClass('dragging');
+    $('#chess-board .chess-square').removeClass('drag-over');
+    var from = dragSourceSquare;
+    dragSourceSquare = null;
+    attemptMove(from, target);
+}
+
+function onPromotionChoice() {
+    if (!pendingPromotion) return;
+    var details = pendingPromotion;
+    var promotion = $(this).data('promotion');
+    hidePromotionDialog();
+    if (details && promotion) {
+        sendMove(details.from, details.to, promotion);
+    }
+}
+
+function updateChessStatus() {
+    if (!chessGame) { $('#chess-status').text(''); return; }
+    var turnName = (chessGame.turn === 'white') ? chessGame.white : chessGame.black;
+    var suffix = chessGame && chessGame.inCheck ? ' (check)' : '';
+    $('#chess-status').text('Turn: ' + turnName + suffix);
+}
+
+function flashStatus(text) {
+    if (!text) return;
+    $('#chess-status').text(text);
+    setTimeout(function(){ if (chessGame) updateChessStatus(); else $('#chess-status').text(''); }, 1500);
+}
+
 function ready() {
     lastPong = undefined;
     users = [];
@@ -1294,264 +1552,6 @@ function ready() {
         $('#chess-status').text('Your color: ' + chessGame.color);
         renderBoard();
         $('#chess-modal').removeClass('hidden');
-    }
-
-    function renderBoard() {
-        if (!chessGame) return;
-        var board = $('#chess-board');
-        board.empty();
-        if (pendingPromotion) {
-            hidePromotionDialog();
-        } else {
-            clearSelection();
-        }
-        dragSourceSquare = null;
-
-        var parts = chessGame.fen.split(' ');
-        var ranksFEN = parts[0].split('/');
-        var files = ['a','b','c','d','e','f','g','h'];
-        var mapPiece = { 'P':'wp','N':'wn','B':'wb','R':'wr','Q':'wq','K':'wk','p':'bp','n':'bn','b':'bb','r':'br','q':'bq','k':'bk' };
-        chessGame.squareMap = {};
-        for (var r = 0; r < 8; r++) {
-            var row = ranksFEN[r];
-            var fileIndex = 0;
-            for (var i = 0; i < row.length; i++) {
-                var ch = row[i];
-                if (/[1-8]/.test(ch)) {
-                    fileIndex += parseInt(ch, 10);
-                } else {
-                    var file = files[fileIndex];
-                    var rank = 8 - r; // FEN rows start at rank 8
-                    var sq = file + String(rank);
-                    var pieceCode = mapPiece[ch] || null;
-                    if (pieceCode) chessGame.squareMap[sq] = pieceCode;
-                    fileIndex++;
-                }
-            }
-        }
-
-        function appendSquare(sq) {
-            var fIndex = sq.charCodeAt(0) - 97; // 'a' -> 0
-            var rNum = parseInt(sq.charAt(1), 10);
-            var light = ((fIndex + rNum) % 2) === 0;
-            var el = $('<div class="chess-square" />').addClass(light ? 'light' : 'dark').attr('data-square', sq);
-            var pieceCode = chessGame.squareMap[sq];
-            if (pieceCode) {
-                var pieceEl = $('<div/>').addClass('chess-piece').addClass('piece-' + pieceCode).attr('draggable', true).attr('data-square', sq).attr('data-piece', pieceCode);
-                el.append(pieceEl);
-            }
-            if (chessGame.lastMove && (sq === chessGame.lastMove.from || sq === chessGame.lastMove.to)) el.addClass('lastmove');
-            board.append(el);
-        }
-
-        var rankOrder = (chessGame.color === 'white') ? [8,7,6,5,4,3,2,1] : [1,2,3,4,5,6,7,8];
-        var fileOrder = (chessGame.color === 'white') ? files : files.slice().reverse();
-        for (var ri = 0; ri < rankOrder.length; ri++) {
-            for (var fi = 0; fi < fileOrder.length; fi++) {
-                appendSquare(fileOrder[fi] + String(rankOrder[ri]));
-            }
-        }
-
-        $('#chess-board .chess-square').removeClass('in-check');
-        if (chessGame.inCheck) {
-            var targetKing = (chessGame.turn === 'white') ? 'wk' : 'bk';
-            var kingSq = null;
-            for (var key in chessGame.squareMap) {
-                if (chessGame.squareMap[key] === targetKing) { kingSq = key; break; }
-            }
-            if (kingSq) {
-                $('#chess-board .chess-square[data-square="' + kingSq + '"]').addClass('in-check');
-            }
-        }
-    }
-
-    function squarePieceCode(sq) {
-        if (!chessGame || !chessGame.squareMap) return null;
-        return chessGame.squareMap[sq] || null;
-    }
-
-    function isPlayersPiece(pieceCode) {
-        if (!chessGame || !pieceCode) return false;
-        if (stockfishGame) {
-            var playerColorLetter = stockfishGame.color === 'w' ? 'w' : 'b';
-            return pieceCode.charAt(0) === playerColorLetter;
-        }
-        if (pieceCode.charAt(0) === 'w') return chessGame.color === 'white';
-        if (pieceCode.charAt(0) === 'b') return chessGame.color === 'black';
-        return false;
-    }
-
-    function clearSelection() {
-        selectedSquare = null;
-        $('#chess-board .chess-square').removeClass('selected');
-    }
-
-    function requiresPromotion(pieceCode, targetSquare) {
-        if (!pieceCode || pieceCode.charAt(1) !== 'p') return false;
-        var rank = parseInt(String(targetSquare).charAt(1), 10);
-        if (isNaN(rank)) return false;
-        if (pieceCode.charAt(0) === 'w') return rank === 8;
-        return rank === 1;
-    }
-
-    function openPromotionDialog(from, to, pieceCode) {
-        pendingPromotion = { from: from, to: to, color: pieceCode.charAt(0) };
-        var options = $('#promotion-options');
-        options.empty();
-        var prefix = pendingPromotion.color;
-        ['q','r','b','n'].forEach(function(symbol) {
-            var option = $('<button type="button" class="promotion-choice" />').attr('data-promotion', symbol);
-            option.append($('<div/>').addClass('promotion-piece').addClass('piece-' + prefix + symbol));
-            options.append(option);
-        });
-        $('#chess-board .chess-square').removeClass('selected');
-        $('#chess-board .chess-square[data-square="' + from + '"]').addClass('selected');
-        $('#chess-board .chess-square[data-square="' + to + '"]').addClass('selected');
-        selectedSquare = from;
-        $('#promotion-overlay').removeClass('hidden');
-    }
-
-    function hidePromotionDialog() {
-        pendingPromotion = null;
-        $('#promotion-overlay').addClass('hidden');
-        $('#promotion-options').empty();
-        clearSelection();
-    }
-
-    function sendMove(from, to, promotion) {
-        if (!chessGame) return;
-        if (stockfishGame) {
-            handleStockfishMove(from, to, promotion);
-            return;
-        }
-        if (!ws || ws.readyState !== 1) return;
-        var payload = { type: 'chess_move', game_id: chessGame.id, from: from, to: to };
-        if (promotion) payload.promotion = promotion;
-        ws.send(JSON.stringify(payload));
-        clearSelection();
-        $('#chess-board .chess-square').removeClass('drag-over');
-    }
-
-    function attemptMove(from, to) {
-        if (!chessGame || pendingPromotion) return;
-        var myTurn = chessGame.turn === chessGame.color;
-        if (!myTurn) {
-            flashStatus('Wait your turn');
-            return;
-        }
-        if (!from || !to || from === to) return;
-        var pieceCode = squarePieceCode(from);
-        if (!pieceCode) {
-            clearSelection();
-            return;
-        }
-        if (!isPlayersPiece(pieceCode)) {
-            flashStatus('Not your piece');
-            clearSelection();
-            return;
-        }
-        if (requiresPromotion(pieceCode, to)) {
-            openPromotionDialog(from, to, pieceCode);
-        } else {
-            sendMove(from, to, null);
-        }
-    }
-
-    function onSquareClick() {
-        if (!chessGame || pendingPromotion) return;
-        var sq = $(this).data('square');
-        var pieceCode = squarePieceCode(sq);
-        var myTurn = chessGame.turn === chessGame.color;
-        if (!selectedSquare) {
-            if (!pieceCode) return;
-            if (!myTurn) { flashStatus('Wait your turn'); return; }
-            if (!isPlayersPiece(pieceCode)) { flashStatus('Not your piece'); return; }
-            selectedSquare = sq;
-            $('#chess-board .chess-square').removeClass('selected');
-            $(this).addClass('selected');
-            return;
-        }
-        if (selectedSquare === sq) {
-            clearSelection();
-            return;
-        }
-        if (pieceCode && isPlayersPiece(pieceCode) && myTurn) {
-            selectedSquare = sq;
-            $('#chess-board .chess-square').removeClass('selected');
-            $(this).addClass('selected');
-            return;
-        }
-        attemptMove(selectedSquare, sq);
-    }
-
-    function onPieceDragStart(e) {
-        if (!chessGame || pendingPromotion) { e.preventDefault(); return; }
-        var parentSquare = $(this).parent().data('square');
-        var pieceCode = squarePieceCode(parentSquare);
-        if (!pieceCode) { e.preventDefault(); return; }
-        if (!isPlayersPiece(pieceCode)) { flashStatus('Not your piece'); e.preventDefault(); return; }
-        if (chessGame.turn !== chessGame.color) { flashStatus('Wait your turn'); e.preventDefault(); return; }
-        dragSourceSquare = parentSquare;
-        $('#chess-board .chess-square').removeClass('selected');
-        $('#chess-board .chess-square[data-square="' + parentSquare + '"]').addClass('selected');
-        selectedSquare = parentSquare;
-        $(this).addClass('dragging');
-        var dt = e.originalEvent && e.originalEvent.dataTransfer;
-        if (dt) {
-            dt.setData('text/plain', parentSquare);
-            dt.effectAllowed = 'move';
-        }
-    }
-
-    function onPieceDragEnd() {
-        $(this).removeClass('dragging');
-        dragSourceSquare = null;
-        clearSelection();
-        $('#chess-board .chess-square').removeClass('drag-over');
-    }
-
-    function onSquareDragOver(e) {
-        if (!dragSourceSquare) return;
-        e.preventDefault();
-        $(this).addClass('drag-over');
-    }
-
-    function onSquareDragLeave() {
-        $(this).removeClass('drag-over');
-    }
-
-    function onSquareDrop(e) {
-        if (!dragSourceSquare) return;
-        e.preventDefault();
-        var target = $(this).data('square');
-        $('#chess-board .chess-piece.dragging').removeClass('dragging');
-        $('#chess-board .chess-square').removeClass('drag-over');
-        var from = dragSourceSquare;
-        dragSourceSquare = null;
-        attemptMove(from, target);
-    }
-
-    function onPromotionChoice() {
-        if (!pendingPromotion) return;
-        var details = pendingPromotion;
-        var promotion = $(this).data('promotion');
-        hidePromotionDialog();
-        if (details && promotion) {
-            sendMove(details.from, details.to, promotion);
-        }
-    }
-
-    function updateChessStatus() {
-        if (!chessGame) { $('#chess-status').text(''); return; }
-        var turnName = (chessGame.turn === 'white') ? chessGame.white : chessGame.black;
-        var suffix = chessGame && chessGame.inCheck ? ' (check)' : '';
-        $('#chess-status').text('Turn: ' + turnName + suffix);
-    }
-
-    function flashStatus(text) {
-        if (!text) return;
-        $('#chess-status').text(text);
-        setTimeout(function(){ if (chessGame) updateChessStatus(); else $('#chess-status').text(''); }, 1500);
     }
 
     // WebSocket message handler
