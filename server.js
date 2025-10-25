@@ -8,7 +8,7 @@ const ChessCtor = require('chess.js').Chess;
 
 // Config (mirrors config.py defaults)
 const HOST = '0.0.0.0';
-const PORT = 12000;
+const PORT = process.env.PORT || 12000;
 const ADMINNAME = 'admin';
 const ADMINHIDDENNAME = 'adminxyz';
 
@@ -59,6 +59,7 @@ loadKnownUsers();
 // Server
 const app = express();
 app.use(express.static(path.join(__dirname)));
+app.use(express.json());
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'talktalktalk.html'));
@@ -70,6 +71,116 @@ app.get('/popsound.mp3', (req, res) => {
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
+
+// Optional: try to load Stockfish WASM module for server-side analysis
+let StockfishFactory = null;
+try {
+  StockfishFactory = require('stockfish');
+} catch (_) {
+  StockfishFactory = null;
+}
+
+function eloToDepth(elo) {
+  const baseElo = 600;
+  const increment = 150;
+  const baseDepth = 5;
+  const depthIncrement = 1;
+  const steps = Math.round((Number(elo) - baseElo) / increment);
+  return Math.max(1, baseDepth + steps * depthIncrement);
+}
+
+async function bestMoveWithStockfish(fen, depth) {
+  if (!StockfishFactory) return null;
+  return await new Promise((resolve) => {
+    try {
+      const engine = StockfishFactory();
+      let resolved = false;
+      const timeout = setTimeout(() => {
+        if (!resolved) { resolved = true; try { engine.postMessage && engine.postMessage('quit'); } catch(_){} resolve(null); }
+      }, Math.min(10000, 1000 + depth * 1000));
+      engine.onmessage = (ev) => {
+        const line = (ev && (ev.data || ev)) || '';
+        if (typeof line === 'string' && line.indexOf('bestmove') > -1) {
+          const bm = line.split(' ')[1];
+          if (!resolved) { resolved = true; clearTimeout(timeout); try { engine.postMessage && engine.postMessage('quit'); } catch(_){} resolve(bm || null); }
+        }
+      };
+      try { engine.postMessage('uci'); } catch(_){}
+      try { engine.postMessage('isready'); } catch(_){}
+      try { engine.postMessage(`position fen ${fen}`); } catch(_){}
+      try { engine.postMessage(`go depth ${Number(depth) || 8}`); } catch(_){}
+    } catch (_) {
+      resolve(null);
+    }
+  });
+}
+
+function evaluateBoardMaterial(chess) {
+  const values = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 0 };
+  const board = chess.board();
+  let score = 0;
+  for (const row of board) {
+    for (const piece of row) {
+      if (!piece) continue;
+      const v = values[piece.type] || 0;
+      score += (piece.color === 'w') ? v : -v;
+    }
+  }
+  return score;
+}
+
+function bestMoveFallback(fen, depth) {
+  const chess = new ChessCtor();
+  try { chess.load(fen); } catch (_) { return null; }
+  const maxDepth = Math.max(1, Math.min(4, Number(depth) || 2));
+  const player = chess.turn();
+  function negamax(d, alpha, beta) {
+    if (d === 0 || chess.game_over()) {
+      const evalScore = evaluateBoardMaterial(chess);
+      return player === 'w' ? evalScore : -evalScore;
+    }
+    let best = -Infinity;
+    const moves = chess.moves({ verbose: true });
+    for (const m of moves) {
+      chess.move(m);
+      const score = -negamax(d - 1, -beta, -alpha);
+      chess.undo();
+      if (score > best) best = score;
+      if (score > alpha) alpha = score;
+      if (alpha >= beta) break;
+    }
+    return best;
+  }
+  let bestMove = null;
+  let bestScore = -Infinity;
+  const moves = chess.moves({ verbose: true });
+  for (const m of moves) {
+    chess.move(m);
+    const score = -negamax(maxDepth - 1, -Infinity, Infinity);
+    chess.undo();
+    if (score > bestScore) { bestScore = score; bestMove = m; }
+  }
+  if (!bestMove) return null;
+  const promo = bestMove.promotion ? bestMove.promotion : '';
+  return bestMove.from + bestMove.to + (promo || '');
+}
+
+app.post('/api/stockfish/move', async (req, res) => {
+  const fen = String(req.body && req.body.fen || '').trim();
+  let depth = Number(req.body && (req.body.depth ?? 0));
+  const elo = Number(req.body && (req.body.elo ?? 0));
+  if (!fen) return res.status(400).json({ error: 'fen required' });
+  if (!depth && elo) depth = eloToDepth(elo);
+  if (!depth) depth = 8;
+  try {
+    let best = await bestMoveWithStockfish(fen, depth);
+    if (!best) best = bestMoveFallback(fen, depth);
+    if (!best) return res.status(422).json({ error: 'no_move' });
+    res.json({ bestmove: best });
+  } catch (e) {
+    res.status(500).json({ error: 'engine_error' });
+  }
+});
 
 // State
 const users = new Map(); // ws -> username

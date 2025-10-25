@@ -746,25 +746,8 @@ function mediaPlaybackRequiresUserGesture() { // http://stackoverflow.com/a/4047
 }
 
 function initializeStockfish() {
-    if (stockfishEngine) return;
-    if (typeof window.Stockfish === 'undefined') {
-        console.error('Stockfish not loaded');
-        return;
-    }
-    stockfishEngine = window.Stockfish();
-    stockfishEngine.onmessage = function(event) {
-        var line = event.data;
-        if (line.indexOf('bestmove') > -1) {
-            var bestmove = line.split(' ')[1];
-            if (bestmove && stockfishGame && !stockfishGame.over) {
-                makeStockfishMove(bestmove);
-            }
-        }
-    };
-    var initCmd = 'uci\n';
-    if (stockfishEngine.postMessage) {
-        stockfishEngine.postMessage(initCmd);
-    }
+    if (stockfishReady) return;
+    stockfishEngine = { serverSide: true };
     stockfishReady = true;
 }
 
@@ -837,10 +820,15 @@ function makeStockfishMove(bestmove) {
         }
         var position = board.fen();
         var depth = stockfishGame.depth;
-        var cmd = 'position fen ' + position + '\ngo depth ' + depth + '\n';
-        if (stockfishEngine.postMessage) {
-            stockfishEngine.postMessage(cmd);
-        }
+        fetch('/api/stockfish/move', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fen: position, depth: depth, elo: stockfishGame.elo })
+        }).then(function(r){ return r.json(); }).then(function(resp){
+            if (resp && resp.bestmove) { makeStockfishMove(resp.bestmove); }
+        }).catch(function(){
+            $('#chess-status').text('Engine error');
+        });
         return;
     }
     stockfishGame.fen = board.fen();
