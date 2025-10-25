@@ -8,7 +8,7 @@ const ChessCtor = require('chess.js').Chess;
 
 // Config (mirrors config.py defaults)
 const HOST = '0.0.0.0';
-const PORT = 12000;
+const PORT = process.env.PORT || 12000;
 const ADMINNAME = 'admin';
 const ADMINHIDDENNAME = 'adminxyz';
 
