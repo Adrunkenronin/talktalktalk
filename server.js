@@ -97,9 +97,13 @@ async function bestMoveWithStockfish(fen, depth) {
       try {
         engine = StockfishFactory();
       } catch (e) {
-        return resolve(null);
+        resolve(null);
+        return;
       }
-      if (!engine) return resolve(null);
+      if (!engine) {
+        resolve(null);
+        return;
+      }
 
       let resolved = false;
       const timeout = setTimeout(() => {
