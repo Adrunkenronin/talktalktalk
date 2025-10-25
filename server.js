@@ -77,6 +77,7 @@ let StockfishFactory = null;
 try {
   StockfishFactory = require('stockfish');
 } catch (_) {
+  console.log('Stockfish module not available, using fallback chess engine');
   StockfishFactory = null;
 }
 
