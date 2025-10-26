@@ -1472,9 +1472,21 @@ function ready() {
     // Chess modal controls
     $('#chess-close').on('click', function(){
         $('#chess-modal').addClass('hidden');
-        if (stockfishGame) {
-            stockfishGame = null;
-            chessGame = null;
+        if (stockfishGame && !stockfishGame.over) {
+            showStockfishRejoinPrompt();
+            try {
+                localStorage.setItem('active_stockfish_game', JSON.stringify({
+                    id: chessGame.id,
+                    white: chessGame.white,
+                    black: chessGame.black,
+                    fen: stockfishGame.fen,
+                    turn: stockfishGame.turn,
+                    color: stockfishGame.color,
+                    engineColor: stockfishGame.engineColor,
+                    elo: stockfishGame.elo,
+                    depth: stockfishGame.depth
+                }));
+            } catch(e){}
         } else if (chessGame && !chessGame.over) {
             showRejoinPrompt();
             try { localStorage.setItem('active_game', JSON.stringify({ id: chessGame.id, white: chessGame.white, black: chessGame.black })); } catch(e){}
