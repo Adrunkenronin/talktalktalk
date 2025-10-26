@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: talktalktalk
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    startCommand: npm start
+    # Render will provide a PORT env var; server.js uses process.env.PORT
+    envVars: []
