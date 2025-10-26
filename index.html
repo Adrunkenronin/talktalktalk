@@ -480,6 +480,10 @@ html {
 .chess-actions { margin-top: auto; display: flex; gap: 0.5rem; }
 .chess-button { padding: 0.5rem 0.75rem; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: var(--bg-secondary); cursor: pointer; }
 .chess-button:hover { background: var(--accent-secondary); color: var(--accent-primary); }
+/* Confirm move button (neon green) */
+.confirm-move-button { background: #39ff14; border: 1px solid #39ff14; color: #000; font-weight: 600; }
+.confirm-move-button:hover { filter: brightness(1.1); }
+.confirm-move-button[disabled] { background: #a3f7a1; border-color: #a3f7a1; color: #27472b; cursor: not-allowed; }
 
 /* Pieces (Staunton-style via external assets) */
 .chess-piece { position: absolute; inset: 0; background-position: center; background-repeat: no-repeat; background-size: 80% auto; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25)); pointer-events: auto; cursor: grab; }
@@ -646,6 +650,7 @@ html {
       <div>White: <span id="chess-white"></span></div>
       <div>Black: <span id="chess-black"></span></div>
       <div class="chess-actions">
+        <button class="chess-button confirm-move-button" id="chess-confirm-move" disabled>Confirm move</button>
         <button class="chess-button" id="chess-resign">Resign</button>
         <button class="chess-button" id="chess-close">Close</button>
       </div>
@@ -692,6 +697,8 @@ var chessGame = null; // {id, white, black, color, fen, turn, lastMove}
 var selectedSquare = null;
 var dragSourceSquare = null;
 var pendingPromotion = null;
+var pendingUserMove = null; // {from,to,promotion}
+var premoveQueue = [];
 
 // Stockfish state
 var stockfishGame = null; // {fen, turn, color, engineColor, elo, over}
@@ -791,6 +798,7 @@ function startStockfishGame(playerColor, elo) {
     $('#chess-white').text(chessGame.white);
     $('#chess-black').text(chessGame.black);
     $('#chess-status').text('Your color: ' + playerColor);
+    pendingUserMove = null; premoveQueue = []; updateConfirmButton();
     renderBoard();
     $('#chess-modal').removeClass('hidden');
     if (playerColor === 'black') {
@@ -844,6 +852,7 @@ function makeStockfishMove(bestmove) {
         $('#chess-status').text('Game over: ' + result + ', ' + winner + ' wins!');
     } else {
         updateChessStatus();
+        tryPlayPremoves();
         if (board.turn() === stockfishGame.engineColor) {
             setTimeout(function() { makeStockfishMove(); }, 300);
         }
@@ -868,6 +877,7 @@ function handleStockfishMove(from, to, promotion) {
         $('#chess-status').text('Game over: ' + result + ', ' + winner + ' wins!');
     } else {
         updateChessStatus();
+        tryPlayPremoves();
         setTimeout(function() { makeStockfishMove(); }, 300);
     }
     return true;
@@ -999,6 +1009,7 @@ function sendMove(from, to, promotion) {
     if (!chessGame) return;
     if (stockfishGame) {
         handleStockfishMove(from, to, promotion);
+        clearPendingMove();
         return;
     }
     if (!ws || ws.readyState !== 1) return;
@@ -1007,30 +1018,90 @@ function sendMove(from, to, promotion) {
     ws.send(JSON.stringify(payload));
     clearSelection();
     $('#chess-board .chess-square').removeClass('drag-over');
+    clearPendingMove();
+}
+
+function updateConfirmButton(){
+    var $btn = $('#chess-confirm-move');
+    if (!$btn.length) return;
+    var canConfirm = !!pendingUserMove && chessGame && (chessGame.turn === chessGame.color);
+    $btn.prop('disabled', !canConfirm);
+}
+
+function clearPendingMove(){
+    pendingUserMove = null;
+    updateConfirmButton();
+}
+
+function stageMove(from, to, promotion){
+    pendingUserMove = { from: from, to: to, promotion: promotion || null };
+    $('#chess-board .chess-square').removeClass('selected');
+    $('#chess-board .chess-square[data-square="' + from + '"]').addClass('selected');
+    $('#chess-board .chess-square[data-square="' + to + '"]').addClass('selected');
+    updateConfirmButton();
+    flashStatus('Move ready. Press Confirm');
+}
+
+function enqueuePremove(from, to, promotion){
+    premoveQueue.push({ from: from, to: to, promotion: promotion || null });
+    flashStatus('Premove queued');
+}
+
+function isMyTurn(){
+    if (!chessGame) return false;
+    return chessGame.turn === chessGame.color;
+}
+
+function tryPlayPremoves(){
+    if (!chessGame || !premoveQueue.length) return;
+    if (!isMyTurn()) return;
+    var mv = premoveQueue.shift();
+    if (stockfishGame) {
+        // validate against current board
+        var b = stockfishGame.board;
+        var ok = b.move({ from: mv.from, to: mv.to, promotion: mv.promotion });
+        if (ok) {
+            // we applied locally; roll back and send through existing flow
+            b.undo();
+            sendMove(mv.from, mv.to, mv.promotion);
+        } else {
+            flashStatus('Premove illegal, skipped');
+            tryPlayPremoves();
+        }
+    } else {
+        sendMove(mv.from, mv.to, mv.promotion);
+    }
 }
 
 function attemptMove(from, to) {
     if (!chessGame || pendingPromotion) return;
-    var myTurn = chessGame.turn === chessGame.color;
-    if (!myTurn) {
-        flashStatus('Wait your turn');
-        return;
-    }
     if (!from || !to || from === to) return;
     var pieceCode = squarePieceCode(from);
-    if (!pieceCode) {
-        clearSelection();
-        return;
-    }
-    if (!isPlayersPiece(pieceCode)) {
-        flashStatus('Not your piece');
-        clearSelection();
-        return;
-    }
+    if (!pieceCode) { clearSelection(); return; }
+    if (!isPlayersPiece(pieceCode)) { flashStatus('Not your piece'); clearSelection(); return; }
+    var myTurn = isMyTurn();
     if (requiresPromotion(pieceCode, to)) {
-        openPromotionDialog(from, to, pieceCode);
+        // Mark promotion context
+        pendingPromotion = { from: from, to: to, color: pieceCode.charAt(0), mode: myTurn ? 'confirm' : 'premove' };
+        var options = $('#promotion-options');
+        options.empty();
+        var prefix = pendingPromotion.color;
+        ['q','r','b','n'].forEach(function(symbol) {
+            var option = $('<button type="button" class="promotion-choice" />').attr('data-promotion', symbol);
+            option.append($('<div/>').addClass('promotion-piece').addClass('piece-' + prefix + symbol));
+            options.append(option);
+        });
+        $('#chess-board .chess-square').removeClass('selected');
+        $('#chess-board .chess-square[data-square="' + from + '"]').addClass('selected');
+        $('#chess-board .chess-square[data-square="' + to + '"]').addClass('selected');
+        selectedSquare = from;
+        $('#promotion-overlay').removeClass('hidden');
     } else {
-        sendMove(from, to, null);
+        if (myTurn) {
+            stageMove(from, to, null);
+        } else {
+            enqueuePremove(from, to, null);
+        }
     }
 }
 
@@ -1041,7 +1112,6 @@ function onSquareClick() {
     var myTurn = chessGame.turn === chessGame.color;
     if (!selectedSquare) {
         if (!pieceCode) return;
-        if (!myTurn) { flashStatus('Wait your turn'); return; }
         if (!isPlayersPiece(pieceCode)) { flashStatus('Not your piece'); return; }
         selectedSquare = sq;
         $('#chess-board .chess-square').removeClass('selected');
@@ -1067,7 +1137,6 @@ function onPieceDragStart(e) {
     var pieceCode = squarePieceCode(parentSquare);
     if (!pieceCode) { e.preventDefault(); return; }
     if (!isPlayersPiece(pieceCode)) { flashStatus('Not your piece'); e.preventDefault(); return; }
-    if (chessGame.turn !== chessGame.color) { flashStatus('Wait your turn'); e.preventDefault(); return; }
     dragSourceSquare = parentSquare;
     $('#chess-board .chess-square').removeClass('selected');
     $('#chess-board .chess-square[data-square="' + parentSquare + '"]').addClass('selected');
@@ -1113,8 +1182,11 @@ function onPromotionChoice() {
     var details = pendingPromotion;
     var promotion = $(this).data('promotion');
     hidePromotionDialog();
-    if (details && promotion) {
-        sendMove(details.from, details.to, promotion);
+    if (!details || !promotion) return;
+    if (details.mode === 'premove') {
+        enqueuePremove(details.from, details.to, promotion);
+    } else {
+        stageMove(details.from, details.to, promotion);
     }
 }
 
@@ -1465,6 +1537,11 @@ function ready() {
             try { localStorage.setItem('active_game', JSON.stringify({ id: chessGame.id, white: chessGame.white, black: chessGame.black })); } catch(e){}
         }
     });
+    $('#chess-confirm-move').on('click', function(){
+        if (!pendingUserMove) return;
+        var m = pendingUserMove; clearPendingMove();
+        sendMove(m.from, m.to, m.promotion);
+    });
     $('#chess-resign').on('click', function(){
         if (stockfishGame) {
             stockfishGame.over = true;
@@ -1550,6 +1627,7 @@ function ready() {
         $('#chess-white').text(chessGame.white);
         $('#chess-black').text(chessGame.black);
         $('#chess-status').text('Your color: ' + chessGame.color);
+        pendingUserMove = null; premoveQueue = []; updateConfirmButton();
         renderBoard();
         $('#chess-modal').removeClass('hidden');
     }
@@ -1649,6 +1727,7 @@ function ready() {
             try { localStorage.setItem('active_game', JSON.stringify({ id: chessGame.id, white: chessGame.white, black: chessGame.black })); } catch(e){}
             $('#chess-white').text(chessGame.white);
             $('#chess-black').text(chessGame.black);
+            pendingUserMove = null; premoveQueue = []; updateConfirmButton();
             showRejoinPrompt();
         }
         else if (data['type'] === 'chess_start') {
@@ -1663,6 +1742,8 @@ function ready() {
                 chessGame.lastMove = { from: data['from'], to: data['to'] };
                 renderBoard();
                 updateChessStatus();
+                clearPendingMove();
+                tryPlayPremoves();
                 if (document.hidden && chessGame.turn === chessGame.color) { __chessUnread += 1; __updateTitleBadge(); }
             }
         }
