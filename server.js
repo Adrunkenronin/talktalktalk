@@ -104,11 +104,16 @@ async function getBestMoveFromLichess(fen, elo) {
       variant: 'standard'
     });
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
     const response = await fetch(`${LICHESS_EVAL_URL}?${params}`, {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
-      timeout: 5000
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       console.warn(`[lichess] HTTP ${response.status}, falling back to local algorithm`);
