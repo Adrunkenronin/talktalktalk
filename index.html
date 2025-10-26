@@ -1492,14 +1492,14 @@ function ready() {
 
     // Unmute audio on first user interaction to comply with browser autoplay policies
     function unmuteAudioOnInteraction() {
-        if (!__audioUnmuted) {
+        if (!__audioUnmuted && popsound) {
             popsound.muted = false;
             __audioUnmuted = true;
             // Remove listeners after first interaction
-            $(document).off('click.audio keydown.audio');
+            $(document).off('click.audio keydown.audio mousedown.audio touchstart.audio');
         }
     }
-    $(document).on('click.audio keydown.audio', unmuteAudioOnInteraction);
+    $(document).on('click.audio keydown.audio mousedown.audio touchstart.audio', unmuteAudioOnInteraction);
 
 
     function popup_message (message, clicktoclosepopup, clicktoreload) {
