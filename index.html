@@ -1408,14 +1408,15 @@ function ready() {
 
         loop = setInterval(function() {
             if (!ws || ws.readyState !== 1) return;
-            ws.send('ping');
+            try { ws.send('ping'); } catch(e) { console.warn('ws.send ping failed', e); }
             if (Date.now() - lastPong > 10000) { // disconnected from internet or phone idle mode; in both cases, ws.readyState can be 1 (OPEN) so we can't use that
-                ws.send('ping');   // this is your last chance ! we send a packet now, and if in 1 second, nothings happen, this means we're dead
+                try { ws.send('ping'); } catch(e) { console.warn('ws.send ping failed', e); }   // this is your last chance ! we send a packet now, and if in 1 second, nothings happen, this means we're dead
                 setTimeout( function() {
                     if (Date.now() - lastPong > 10000)  // you missed your last chance !
                         popup_message('Click anywhere or press any key to reload the page.', false, true);     // disconnected from internet
-                    else                                // ok the phone was just idle, let's resume
-                        ws.send(JSON.stringify({ "type" : "username", "username" : $('#username').text() }));  // let's send username again, so that other users see me
+                    else {                               // ok the phone was just idle, let's resume
+                        try { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ "type" : "username", "username" : $('#username').text() })); } catch(e) { console.warn('ws.send username failed', e); }
+                    }
                 }, 1000);
             }
         }, 5000);
