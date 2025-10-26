@@ -76,12 +76,37 @@ const wss = new WebSocket.Server({ server });
 let StockfishFactory = null;
 
 function eloToDepth(elo) {
-  const baseElo = 600;
-  const increment = 150;
-  const baseDepth = 5;
-  const depthIncrement = 1;
-  const steps = Math.round((Number(elo) - baseElo) / increment);
-  return Math.max(1, baseDepth + steps * depthIncrement);
+  const rating = Number(elo) || 600;
+
+  const eloDepthMap = [
+    { elo: 600, depth: 5 },
+    { elo: 750, depth: 6 },
+    { elo: 900, depth: 7 },
+    { elo: 1050, depth: 8 },
+    { elo: 1200, depth: 9 },
+    { elo: 1350, depth: 10 },
+    { elo: 1500, depth: 11 },
+    { elo: 1650, depth: 12 },
+    { elo: 1800, depth: 13 },
+    { elo: 1950, depth: 14 },
+    { elo: 2100, depth: 15 },
+    { elo: 2250, depth: 16 },
+    { elo: 2400, depth: 17 }
+  ];
+
+  if (rating <= eloDepthMap[0].elo) return eloDepthMap[0].depth;
+  if (rating >= eloDepthMap[eloDepthMap.length - 1].elo) return eloDepthMap[eloDepthMap.length - 1].depth;
+
+  for (let i = 0; i < eloDepthMap.length - 1; i++) {
+    if (rating >= eloDepthMap[i].elo && rating <= eloDepthMap[i + 1].elo) {
+      const lower = eloDepthMap[i];
+      const upper = eloDepthMap[i + 1];
+      const ratio = (rating - lower.elo) / (upper.elo - lower.elo);
+      return Math.round(lower.depth + (upper.depth - lower.depth) * ratio);
+    }
+  }
+
+  return 8;
 }
 
 async function bestMoveWithStockfish(fen, depth) {
