@@ -919,7 +919,6 @@ function makeStockfishMove(bestmove) {
                 return r.json();
             }).then(function(resp){
                 if (resp && resp.bestmove) { makeStockfishMove(resp.bestmove); }
-                if (resp && resp.bestmove) { makeStockfishMove(resp.bestmove); }
                 else if (resp && resp.error) {
                     console.warn('Engine responded with error:', resp.error);
                     $('#chess-status').text('Engine error: ' + resp.error);
