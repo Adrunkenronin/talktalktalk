@@ -1981,5 +1981,32 @@ function ready() {
 $(document).ready(ready);
 
 </script>
+<script>
+// Global handlers to suppress/handle external iframe evaluation timeouts (e.g. from builder.io CDN)
+window.addEventListener('unhandledrejection', function(ev) {
+  try {
+    var reason = ev && ev.reason ? ev.reason : ev;
+    var msg = (reason && reason.message) ? reason.message : String(reason);
+    if (msg && (msg.indexOf('IFrame evaluation timeout') !== -1 || msg.indexOf('cdn.builder.io') !== -1 || msg.indexOf('IFrame evaluation') !== -1)) {
+      // Non-fatal external iframe timeout from third-party script — log and prevent uncaught rejection
+      console.warn('Suppressed external iframe error:', msg, reason);
+      ev.preventDefault && ev.preventDefault();
+      return;
+    }
+  } catch (e) { /* ignore */ }
+});
+
+window.addEventListener('error', function(ev) {
+  try {
+    var msg = ev && ev.message ? ev.message : '';
+    if (msg && (msg.indexOf('IFrame evaluation timeout') !== -1 || msg.indexOf('cdn.builder.io') !== -1 || msg.indexOf('IFrame evaluation') !== -1)) {
+      // Log and swallow to avoid noisy uncaught errors originating from injected third-party iframes
+      console.warn('Suppressed external iframe error (window.error):', msg, ev.error || ev);
+      ev.stopImmediatePropagation && ev.stopImmediatePropagation();
+      return true;
+    }
+  } catch (e) { /* ignore */ }
+});
+</script>
 </body>
 </html>
