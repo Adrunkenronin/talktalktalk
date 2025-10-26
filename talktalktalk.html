@@ -1646,15 +1646,17 @@ function ready() {
 
     function showStockfishRejoinPrompt() {
         if (!$('#invites #rejoin-stockfish-game').length) {
-            var wrap = $('<div class="user-row" id="rejoin-stockfish-wrapper" />');
-            var btn = $('<button class="invite-user-btn" id="rejoin-stockfish-game">Stockfish game</button>');
+            var wrap = $('<div class="user-row" id="rejoin-stockfish-wrapper" style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border-light);" />');
+            var btn = $('<button class="invite-user-btn" id="rejoin-stockfish-game" style="padding: 0.25rem 0.75rem; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--accent-primary); color: white; cursor: pointer; font-size: 0.875rem; font-weight: 500;">Resume Stockfish Game</button>');
             wrap.append(btn);
             $('#invites').append(wrap);
+            console.log('Stockfish rejoin button shown');
         }
     }
 
     function hideStockfishRejoinPrompt() {
         $('#rejoin-stockfish-wrapper').remove();
+        console.log('Stockfish rejoin button hidden');
     }
 
     function startChessGame(data) {
