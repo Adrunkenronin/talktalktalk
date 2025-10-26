@@ -179,7 +179,18 @@ async function bestMoveWithStockfish(fen, depth, elo) {
                 cleanup();
                 const keys = Object.keys(pvMap).map(Number).sort((a,b)=>a-b);
                 const cands = keys.map(k => (pvMap[k] ? pvMap[k].split(' ')[0] : null)).filter(Boolean);
-                const chosen = sampleMove(cands) || mv;
+                let chosen = sampleMove(cands) || mv;
+                try {
+                  const prev = lastEngineMoveByFen.get(fen);
+                  const isSame = prev && chosen === prev;
+                  const isReverse = prev && prev.length >= 4 && chosen && chosen.length >= 4 && chosen.substring(0,2) === prev.substring(2,4) && chosen.substring(2,4) === prev.substring(0,2);
+                  if ((isSame || isReverse) && cands.length > 1) {
+                    const alt = cands.find(m => m !== prev && !(m.substring(0,2) === prev.substring(2,4) && m.substring(2,4) === prev.substring(0,2)));
+                    if (alt) chosen = alt;
+                  }
+                  lastEngineMoveByFen.set(fen, chosen);
+                } catch (e) {}
+                console.info('[stockfish] pv', { fen: fen, candidates: cands, chosen: chosen, raw_bestmove: mv });
                 resolve(chosen);
               }
             }
@@ -248,7 +259,18 @@ async function bestMoveWithStockfish(fen, depth, elo) {
                 cleanup();
                 const keys = Object.keys(pvMap).map(Number).sort((a,b)=>a-b);
                 const cands = keys.map(k => (pvMap[k] ? pvMap[k].split(' ')[0] : null)).filter(Boolean);
-                const chosen = sampleMove(cands) || mv;
+                let chosen = sampleMove(cands) || mv;
+                try {
+                  const prev = lastEngineMoveByFen.get(fen);
+                  const isSame = prev && chosen === prev;
+                  const isReverse = prev && prev.length >= 4 && chosen && chosen.length >= 4 && chosen.substring(0,2) === prev.substring(2,4) && chosen.substring(2,4) === prev.substring(0,2);
+                  if ((isSame || isReverse) && cands.length > 1) {
+                    const alt = cands.find(m => m !== prev && !(m.substring(0,2) === prev.substring(2,4) && m.substring(2,4) === prev.substring(0,2)));
+                    if (alt) chosen = alt;
+                  }
+                  lastEngineMoveByFen.set(fen, chosen);
+                } catch (e) {}
+                console.info('[stockfish] pv', { fen: fen, candidates: cands, chosen: chosen, raw_bestmove: mv });
                 resolve(chosen);
               }
             }
