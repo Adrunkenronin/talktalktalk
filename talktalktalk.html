@@ -848,7 +848,7 @@ function makeStockfishMove(bestmove, retries) {
         var depth = stockfishGame.depth;
         $('#chess-status').text('Engine thinking...');
         var controller = new AbortController();
-        var timeoutId = setTimeout(function(){ controller.abort(); }, 8000);
+        var timeoutId = setTimeout(function(){ controller.abort(); }, 12000);
         fetch('/api/stockfish/move', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -861,7 +861,8 @@ function makeStockfishMove(bestmove, retries) {
         }).then(function(resp){
             if (resp && resp.bestmove) { makeStockfishMove(resp.bestmove); }
             else if (resp && resp.error && retries < 3) {
-                setTimeout(function() { makeStockfishMove(null, retries + 1); }, 500);
+                $('#chess-status').text('Engine busy, retrying...');
+                setTimeout(function() { makeStockfishMove(null, retries + 1); }, 1000);
             }
             else {
                 $('#chess-status').text('Engine error, please try again');
@@ -869,7 +870,8 @@ function makeStockfishMove(bestmove, retries) {
         }).catch(function(err){
             clearTimeout(timeoutId);
             if (retries < 3) {
-                setTimeout(function() { makeStockfishMove(null, retries + 1); }, 500);
+                $('#chess-status').text('Engine busy, retrying...');
+                setTimeout(function() { makeStockfishMove(null, retries + 1); }, 1000);
             } else {
                 $('#chess-status').text('Engine error, please reload');
             }
