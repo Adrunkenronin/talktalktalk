@@ -268,7 +268,10 @@ app.post('/api/stockfish/move', async (req, res) => {
   } catch (_) {}
 
   try {
-    const best = bestMoveFallback(fen, depth);
+    let best = await bestMoveWithStockfish(fen, depth);
+    if (!best) {
+      best = bestMoveFallback(fen, depth);
+    }
     if (!best) {
       console.warn('[stockfish] no_move for fen', fen);
       return res.status(422).json({ error: 'no_move' });
