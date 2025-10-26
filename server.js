@@ -83,6 +83,8 @@ const wss = new WebSocket.Server({ server });
 
 // Stockfish WASM module is unreliable on server-side, using fallback algorithm instead
 let StockfishFactory = null;
+// Track last engine move per position to avoid immediate repeats (in-memory)
+const lastEngineMoveByFen = new Map();
 
 function eloToDepth(elo) {
   const rating = Number(elo) || 600;
