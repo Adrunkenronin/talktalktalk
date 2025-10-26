@@ -72,47 +72,45 @@ app.get('/popsound.mp3', (req, res) => {
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Optional: try to load Stockfish WASM module for server-side analysis
+// Stockfish WASM module is unreliable on server-side, using fallback algorithm instead
 let StockfishFactory = null;
-try {
-  StockfishFactory = require('stockfish');
-} catch (_) {
-  StockfishFactory = null;
-}
 
 function eloToDepth(elo) {
-  const baseElo = 600;
-  const increment = 150;
-  const baseDepth = 5;
-  const depthIncrement = 1;
-  const steps = Math.round((Number(elo) - baseElo) / increment);
-  return Math.max(1, baseDepth + steps * depthIncrement);
+  const rating = Number(elo) || 600;
+
+  const eloDepthMap = [
+    { elo: 600, depth: 5 },
+    { elo: 750, depth: 6 },
+    { elo: 900, depth: 7 },
+    { elo: 1050, depth: 8 },
+    { elo: 1200, depth: 9 },
+    { elo: 1350, depth: 10 },
+    { elo: 1500, depth: 11 },
+    { elo: 1650, depth: 12 },
+    { elo: 1800, depth: 13 },
+    { elo: 1950, depth: 14 },
+    { elo: 2100, depth: 15 },
+    { elo: 2250, depth: 16 },
+    { elo: 2400, depth: 17 }
+  ];
+
+  if (rating <= eloDepthMap[0].elo) return eloDepthMap[0].depth;
+  if (rating >= eloDepthMap[eloDepthMap.length - 1].elo) return eloDepthMap[eloDepthMap.length - 1].depth;
+
+  for (let i = 0; i < eloDepthMap.length - 1; i++) {
+    if (rating >= eloDepthMap[i].elo && rating <= eloDepthMap[i + 1].elo) {
+      const lower = eloDepthMap[i];
+      const upper = eloDepthMap[i + 1];
+      const ratio = (rating - lower.elo) / (upper.elo - lower.elo);
+      return Math.round(lower.depth + (upper.depth - lower.depth) * ratio);
+    }
+  }
+
+  return 8;
 }
 
 async function bestMoveWithStockfish(fen, depth) {
-  if (!StockfishFactory) return null;
-  return await new Promise((resolve) => {
-    try {
-      const engine = StockfishFactory();
-      let resolved = false;
-      const timeout = setTimeout(() => {
-        if (!resolved) { resolved = true; try { engine.postMessage && engine.postMessage('quit'); } catch(_){} resolve(null); }
-      }, Math.min(10000, 1000 + depth * 1000));
-      engine.onmessage = (ev) => {
-        const line = (ev && (ev.data || ev)) || '';
-        if (typeof line === 'string' && line.indexOf('bestmove') > -1) {
-          const bm = line.split(' ')[1];
-          if (!resolved) { resolved = true; clearTimeout(timeout); try { engine.postMessage && engine.postMessage('quit'); } catch(_){} resolve(bm || null); }
-        }
-      };
-      try { engine.postMessage('uci'); } catch(_){}
-      try { engine.postMessage('isready'); } catch(_){}
-      try { engine.postMessage(`position fen ${fen}`); } catch(_){}
-      try { engine.postMessage(`go depth ${Number(depth) || 8}`); } catch(_){}
-    } catch (_) {
-      resolve(null);
-    }
-  });
+  return null;
 }
 
 function evaluateBoardMaterial(chess) {
@@ -132,7 +130,7 @@ function evaluateBoardMaterial(chess) {
 function bestMoveFallback(fen, depth) {
   const chess = new ChessCtor();
   try { chess.load(fen); } catch (_) { return null; }
-  const maxDepth = Math.max(1, Math.min(4, Number(depth) || 2));
+  const maxDepth = Math.max(1, Number(depth) || 5);
   const player = chess.turn();
   function negamax(d, alpha, beta) {
     if (d === 0 || chess.game_over()) {
@@ -172,9 +170,9 @@ app.post('/api/stockfish/move', async (req, res) => {
   if (!fen) return res.status(400).json({ error: 'fen required' });
   if (!depth && elo) depth = eloToDepth(elo);
   if (!depth) depth = 8;
+
   try {
-    let best = await bestMoveWithStockfish(fen, depth);
-    if (!best) best = bestMoveFallback(fen, depth);
+    const best = bestMoveFallback(fen, depth);
     if (!best) return res.status(422).json({ error: 'no_move' });
     res.json({ bestmove: best });
   } catch (e) {
