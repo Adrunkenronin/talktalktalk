@@ -703,7 +703,8 @@ html {
 </div>
 <script type="text/javascript">
 var popsound = new Audio('popsound.mp3');
-// API base: if page is opened via file:// fallback to localhost dev server
+popsound.muted = true; // Mute initially to comply with browser autoplay policies
+var __audioUnmuted = false; // Track if audio has been unmuted after user interaction
 var API_BASE = (location.protocol === 'file:') ? (window.__API_BASE_OVERRIDE__ || 'http://localhost:12000') : '';
 var randomname = 'user' + Math.floor((Math.random() * 1000) + 1);
 var displayeduser;
@@ -2135,7 +2136,7 @@ window.addEventListener('unhandledrejection', function(ev) {
     var reason = ev && ev.reason ? ev.reason : ev;
     var msg = (reason && reason.message) ? reason.message : String(reason);
     if (msg && (msg.indexOf('IFrame evaluation timeout') !== -1 || msg.indexOf('cdn.builder.io') !== -1 || msg.indexOf('IFrame evaluation') !== -1)) {
-      // Non-fatal external iframe timeout from third-party script — log and prevent uncaught rejection
+      // Non-fatal external iframe timeout from third-party script �� log and prevent uncaught rejection
       console.warn('Suppressed external iframe error:', msg, reason);
       ev.preventDefault && ev.preventDefault();
       return;
