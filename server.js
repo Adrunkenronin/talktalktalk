@@ -60,6 +60,14 @@ loadKnownUsers();
 const app = express();
 app.use(express.static(path.join(__dirname)));
 app.use(express.json());
+// Allow CORS for API endpoints so clients opened from file:// or other origins can call /api
+app.use(function(req, res, next) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'talktalktalk.html'));
@@ -171,12 +179,26 @@ app.post('/api/stockfish/move', async (req, res) => {
   if (!depth && elo) depth = eloToDepth(elo);
   if (!depth) depth = 8;
 
+  // Diagnostic logging to help debug Network/engine issues
+  try {
+    console.log('[stockfish] request', {
+      time: new Date().toISOString(),
+      ip: req.ip,
+      forwarded: req.headers['x-forwarded-for'] || null,
+      body: req.body
+    });
+  } catch (_) {}
+
   try {
     const best = bestMoveFallback(fen, depth);
-    if (!best) return res.status(422).json({ error: 'no_move' });
-    res.json({ bestmove: best });
+    if (!best) {
+      console.warn('[stockfish] no_move for fen', fen);
+      return res.status(422).json({ error: 'no_move' });
+    }
+    return res.json({ bestmove: best });
   } catch (e) {
-    res.status(500).json({ error: 'engine_error' });
+    console.error('[stockfish] engine error', e && e.stack ? e.stack : e);
+    return res.status(500).json({ error: 'engine_error' });
   }
 });
 

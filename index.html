@@ -16,6 +16,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<script>
+// Ensure FullStory namespace is set before any FullStory script runs to avoid conflicts
+try { window._fs_namespace = window._fs_namespace || 'FS'; } catch(e) {}
+// Guard document.cookie access in sandboxed iframes — accessing cookies in sandbox without allow-same-origin throws
+try {
+  if (typeof document !== 'undefined' && typeof Object.getOwnPropertyDescriptor === 'function') {
+    var desc = Object.getOwnPropertyDescriptor(Document.prototype, 'cookie');
+    if (desc && desc.get) {
+      var origGet = desc.get;
+      Object.defineProperty(document, 'cookie', {
+        get: function() {
+          try { return origGet.call(document); } catch(e) { return ''; }
+        }
+      });
+    }
+  }
+} catch(e) {}
+</script>
 <script src="https://cdn.jsdelivr.net/npm/stockfish@11.0.0/src/stockfish.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chess.js@0.12.0/chess.min.js"></script>
 <style type="text/css">
@@ -480,6 +498,22 @@ html {
 .chess-actions { margin-top: auto; display: flex; gap: 0.5rem; }
 .chess-button { padding: 0.5rem 0.75rem; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: var(--bg-secondary); cursor: pointer; }
 .chess-button:hover { background: var(--accent-secondary); color: var(--accent-primary); }
+/* Confirm move button (neon green) */
+.confirm-move-button { background: #39ff14; border: 1px solid #39ff14; color: #000; font-weight: 600; }
+.confirm-move-button:hover { filter: brightness(1.1); }
+.confirm-move-button[disabled] { background: #a3f7a1; border-color: #a3f7a1; color: #27472b; cursor: not-allowed; }
+/* Premove highlight (slightly red, like chess.com) */
+.chess-square.premove { box-shadow: inset 0 0 0 3px rgba(220, 53, 69, 0.35); }
+.chess-square.premove::after { content: ''; position: absolute; inset: 0; background: rgba(220, 53, 69, 0.08); pointer-events: none; }
+/* History control styles */
+.history-controls .chess-button { width: 2.25rem; height: 2.25rem; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; }
+.history-controls .chess-button:disabled { opacity: 0.45; cursor: not-allowed; }
+/* Tentative move visuals */
+.chess-square.tentative-source .chess-piece { opacity: 0.08 !important; }
+.chess-piece.tentative-piece { position: absolute; inset: 0; background-position: center; background-repeat: no-repeat; background-size: 80% auto; pointer-events: none; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25)); opacity: 0.95; transform: translateZ(0); }
+/* Tentative move visuals */
+.chess-square.tentative-source .chess-piece { opacity: 0.08 !important; }
+.chess-piece.tentative-piece { position: absolute; inset: 0; background-position: center; background-repeat: no-repeat; background-size: 80% auto; pointer-events: none; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25)); opacity: 0.95; transform: translateZ(0); }
 
 /* Pieces (Staunton-style via external assets) */
 .chess-piece { position: absolute; inset: 0; background-position: center; background-repeat: no-repeat; background-size: 80% auto; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25)); pointer-events: auto; cursor: grab; }
@@ -642,10 +676,16 @@ html {
     <div class="chess-board" id="chess-board"></div>
     <div class="chess-panel">
       <h4>Chess</h4>
+      <div class="history-controls" style="display:flex;gap:0.5rem;align-items:center;">
+        <button class="chess-button" id="chess-prev" title="Previous move"><i class="fas fa-chevron-left"></i></button>
+        <button class="chess-button" id="chess-next" title="Next move"><i class="fas fa-chevron-right"></i></button>
+        <div style="flex:1"></div>
+      </div>
       <div class="chess-status" id="chess-status"></div>
       <div>White: <span id="chess-white"></span></div>
       <div>Black: <span id="chess-black"></span></div>
       <div class="chess-actions">
+        <button class="chess-button confirm-move-button" id="chess-confirm-move" disabled>Confirm move</button>
         <button class="chess-button" id="chess-resign">Resign</button>
         <button class="chess-button" id="chess-close">Close</button>
       </div>
@@ -663,6 +703,8 @@ html {
 </div>
 <script type="text/javascript">
 var popsound = new Audio('popsound.mp3');
+// API base: if page is opened via file:// fallback to localhost dev server
+var API_BASE = (location.protocol === 'file:') ? (window.__API_BASE_OVERRIDE__ || 'http://localhost:12000') : '';
 var randomname = 'user' + Math.floor((Math.random() * 1000) + 1);
 var displayeduser;
 var ws;
@@ -692,6 +734,11 @@ var chessGame = null; // {id, white, black, color, fen, turn, lastMove}
 var selectedSquare = null;
 var dragSourceSquare = null;
 var pendingPromotion = null;
+var pendingUserMove = null; // {from,to,promotion}
+var premoveQueue = [];
+var currentTentative = null; // {from,to,isPremove}
+// Guards to prevent re-entrant premove processing and concurrent engine fetches
+var __processingPremoves = false;
 
 // Stockfish state
 var stockfishGame = null; // {fen, turn, color, engineColor, elo, over}
@@ -761,40 +808,50 @@ function eloToDepth(elo) {
 }
 
 function startStockfishGame(playerColor, elo) {
-    if (!stockfishEngine) initializeStockfish();
-    if (typeof Chess === 'undefined') {
-        alert('Chess library not loaded. Please refresh the page.');
-        return;
-    }
-    var board = new Chess();
-    stockfishGame = {
-        board: board,
-        fen: board.fen(),
-        turn: 'w',
-        color: playerColor === 'white' ? 'w' : 'b',
-        engineColor: playerColor === 'white' ? 'b' : 'w',
-        elo: elo,
-        depth: eloToDepth(elo),
-        over: false
-    };
-    var me = $('#username').text();
-    chessGame = {
-        id: 'stockfish_' + Date.now(),
-        white: playerColor === 'white' ? me : 'Stockfish (' + elo + ')',
-        black: playerColor === 'black' ? me : 'Stockfish (' + elo + ')',
-        color: playerColor === 'white' ? 'white' : 'black',
-        fen: board.fen(),
-        turn: 'white',
-        lastMove: null,
-        over: false
-    };
-    $('#chess-white').text(chessGame.white);
-    $('#chess-black').text(chessGame.black);
-    $('#chess-status').text('Your color: ' + playerColor);
-    renderBoard();
-    $('#chess-modal').removeClass('hidden');
-    if (playerColor === 'black') {
-        setTimeout(function() { makeStockfishMove(); }, 500);
+    try {
+        if (!stockfishEngine) initializeStockfish();
+        if (typeof Chess === 'undefined') {
+            alert('Chess library not loaded. Please refresh the page.');
+            return;
+        }
+        var board = new Chess();
+        stockfishGame = {
+            board: board,
+            fen: board.fen(),
+            turn: 'w',
+            color: playerColor === 'white' ? 'w' : 'b',
+            engineColor: playerColor === 'white' ? 'b' : 'w',
+            elo: elo,
+            depth: eloToDepth(elo),
+            over: false
+        };
+        var me = $('#username').text();
+        chessGame = {
+            id: 'stockfish_' + Date.now(),
+            white: playerColor === 'white' ? me : 'Stockfish (' + elo + ')',
+            black: playerColor === 'black' ? me : 'Stockfish (' + elo + ')',
+            color: playerColor === 'white' ? 'white' : 'black',
+            fen: board.fen(),
+            turn: 'white',
+            lastMove: null,
+            over: false,
+            moveHistory: [{ fen: board.fen(), from: null, to: null }],
+            historyIndex: 0
+        };
+        $('#chess-white').text(chessGame.white);
+        $('#chess-black').text(chessGame.black);
+        $('#chess-status').text('Your color: ' + playerColor);
+        pendingUserMove = null; premoveQueue = []; updateConfirmButton();
+        renderBoard();
+        updateHistoryControls && updateHistoryControls();
+        $('#chess-modal').removeClass('hidden');
+        if (playerColor === 'black') {
+            setTimeout(function() { makeStockfishMove(); }, 500);
+        }
+    } catch (err) {
+        console.error('startStockfishGame error:', err);
+        flashStatus('Error starting engine: ' + (err && err.message ? err.message : String(err)));
+        alert('Error starting Stockfish: ' + (err && err.message ? err.message : String(err)));
     }
 }
 
@@ -820,15 +877,50 @@ function makeStockfishMove(bestmove) {
         }
         var position = board.fen();
         var depth = stockfishGame.depth;
-        fetch('/api/stockfish/move', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fen: position, depth: depth, elo: stockfishGame.elo })
-        }).then(function(r){ return r.json(); }).then(function(resp){
-            if (resp && resp.bestmove) { makeStockfishMove(resp.bestmove); }
-        }).catch(function(){
-            $('#chess-status').text('Engine error');
-        });
+        (function attemptFetch(retries){
+            if (!stockfishGame) return;
+            stockfishGame.fetchInFlight = stockfishGame.fetchInFlight || false;
+            if (stockfishGame.fetchInFlight) {
+                // Another fetch is already in flight — retry shortly
+                if (retries > 0) { setTimeout(function(){ attemptFetch(retries - 1); }, 150); }
+                else { $('#chess-status').text('Engine busy, try again'); }
+                return;
+            }
+            stockfishGame.fetchInFlight = true;
+            var url = (API_BASE || '') + '/api/stockfish/move';
+            var payload = { fen: position, depth: depth, elo: stockfishGame.elo };
+            try { console.info('[stockfish] fetching', { url: url, payload: payload }); } catch(e){}
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(function(r){
+                stockfishGame.fetchInFlight = false;
+                if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + r.statusText);
+                return r.json();
+            }).then(function(resp){
+                if (resp && resp.bestmove) { makeStockfishMove(resp.bestmove); }
+                if (resp && resp.bestmove) { makeStockfishMove(resp.bestmove); }
+                else if (resp && resp.error) {
+                    console.warn('Engine responded with error:', resp.error);
+                    $('#chess-status').text('Engine error: ' + resp.error);
+                }
+                else {
+                    $('#chess-status').text('Engine returned invalid response');
+                }
+            }).catch(function(err){
+                stockfishGame.fetchInFlight = false;
+                console.error('Stockfish fetch error:', err);
+                if (retries > 0) {
+                    // exponential backoff retry
+                    var wait = 300 * Math.pow(2, 3 - retries);
+                    console.warn('Retrying stockfish fetch in', wait, 'ms (retries left:', retries - 1 + ')');
+                    setTimeout(function(){ attemptFetch(retries - 1); }, wait);
+                } else {
+                    $('#chess-status').text('Engine error (network)');
+                }
+            });
+        })(3);
         return;
     }
     stockfishGame.fen = board.fen();
@@ -836,6 +928,10 @@ function makeStockfishMove(bestmove) {
     chessGame.fen = board.fen();
     chessGame.turn = board.turn() === 'w' ? 'white' : 'black';
     chessGame.lastMove = { from: moves.from, to: moves.to };
+    // push to history
+    chessGame.moveHistory = chessGame.moveHistory || [];
+    chessGame.moveHistory.push({ fen: board.fen(), from: moves.from, to: moves.to });
+    chessGame.historyIndex = chessGame.moveHistory.length - 1;
     renderBoard();
     if (board.in_checkmate() || board.in_stalemate()) {
         stockfishGame.over = true;
@@ -844,6 +940,7 @@ function makeStockfishMove(bestmove) {
         $('#chess-status').text('Game over: ' + result + ', ' + winner + ' wins!');
     } else {
         updateChessStatus();
+        tryPlayPremoves();
         if (board.turn() === stockfishGame.engineColor) {
             setTimeout(function() { makeStockfishMove(); }, 300);
         }
@@ -860,6 +957,10 @@ function handleStockfishMove(from, to, promotion) {
     chessGame.fen = board.fen();
     chessGame.turn = board.turn() === 'w' ? 'white' : 'black';
     chessGame.lastMove = { from: from, to: to };
+    // push to history
+    chessGame.moveHistory = chessGame.moveHistory || [];
+    chessGame.moveHistory.push({ fen: board.fen(), from: from, to: to });
+    chessGame.historyIndex = chessGame.moveHistory.length - 1;
     renderBoard();
     if (board.in_checkmate() || board.in_stalemate()) {
         stockfishGame.over = true;
@@ -868,6 +969,7 @@ function handleStockfishMove(from, to, promotion) {
         $('#chess-status').text('Game over: ' + result + ', ' + winner + ' wins!');
     } else {
         updateChessStatus();
+        tryPlayPremoves();
         setTimeout(function() { makeStockfishMove(); }, 300);
     }
     return true;
@@ -917,7 +1019,8 @@ function renderBoard() {
             var pieceEl = $('<div/>').addClass('chess-piece').addClass('piece-' + pieceCode).attr('draggable', true).attr('data-square', sq).attr('data-piece', pieceCode);
             el.append(pieceEl);
         }
-        if (chessGame.lastMove && (sq === chessGame.lastMove.from || sq === chessGame.lastMove.to)) el.addClass('lastmove');
+        var histEntry = (chessGame.moveHistory && typeof chessGame.historyIndex !== 'undefined') ? chessGame.moveHistory[chessGame.historyIndex] : null;
+        if ((histEntry && (sq === histEntry.from || sq === histEntry.to)) || (chessGame.lastMove && (sq === chessGame.lastMove.from || sq === chessGame.lastMove.to))) el.addClass('lastmove');
         board.append(el);
     }
 
@@ -939,6 +1042,17 @@ function renderBoard() {
         if (kingSq) {
             $('#chess-board .chess-square[data-square="' + kingSq + '"]').addClass('in-check');
         }
+    }
+    // Re-apply premove highlights after board render
+    renderPremoveHighlights();
+    // Re-apply any tentative visuals (staged move or latest premove)
+    if (pendingUserMove && pendingUserMove.from && pendingUserMove.to) {
+        currentTentative = { from: pendingUserMove.from, to: pendingUserMove.to, isPremove: false };
+        showTentativeMove(pendingUserMove.from, pendingUserMove.to);
+    } else if (premoveQueue && premoveQueue.length) {
+        var last = premoveQueue[premoveQueue.length - 1];
+        currentTentative = { from: last.from, to: last.to, isPremove: true };
+        showTentativeMove(last.from, last.to, true);
     }
 }
 
@@ -999,6 +1113,7 @@ function sendMove(from, to, promotion) {
     if (!chessGame) return;
     if (stockfishGame) {
         handleStockfishMove(from, to, promotion);
+        clearPendingMove();
         return;
     }
     if (!ws || ws.readyState !== 1) return;
@@ -1007,30 +1122,151 @@ function sendMove(from, to, promotion) {
     ws.send(JSON.stringify(payload));
     clearSelection();
     $('#chess-board .chess-square').removeClass('drag-over');
+    clearPendingMove();
 }
+
+function updateConfirmButton(){
+    var $btn = $('#chess-confirm-move');
+    if (!$btn.length) return;
+    var canConfirm = !!pendingUserMove && chessGame && (chessGame.turn === chessGame.color);
+    $btn.prop('disabled', !canConfirm);
+}
+
+function clearPendingMove(){
+    pendingUserMove = null;
+    updateConfirmButton();
+    clearTentativeMoveVisuals();
+}
+
+function stageMove(from, to, promotion){
+    // Clear existing tentative visuals
+    clearTentativeMoveVisuals();
+    pendingUserMove = { from: from, to: to, promotion: promotion || null };
+    $('#chess-board .chess-square').removeClass('selected');
+    $('#chess-board .chess-square[data-square="' + from + '"]').addClass('selected');
+    $('#chess-board .chess-square[data-square="' + to + '"]').addClass('selected');
+    currentTentative = { from: from, to: to, isPremove: false };
+    showTentativeMove(from, to);
+    updateConfirmButton();
+    flashStatus('Move ready. Press Confirm');
+}
+
+function enqueuePremove(from, to, promotion){
+    premoveQueue.push({ from: from, to: to, promotion: promotion || null });
+    flashStatus('Premove queued');
+    // Show the latest premove as tentative visual
+    var mv = premoveQueue[premoveQueue.length - 1];
+    clearTentativeMoveVisuals();
+    currentTentative = { from: mv.from, to: mv.to, isPremove: true };
+    showTentativeMove(mv.from, mv.to, true);
+    renderPremoveHighlights();
+}
+
+function isMyTurn(){
+    if (!chessGame) return false;
+    return chessGame.turn === chessGame.color;
+}
+
+function tryPlayPremoves(){
+    if (__processingPremoves) return; // avoid re-entrancy
+    __processingPremoves = true;
+    try {
+        if (!chessGame || !premoveQueue.length) return;
+
+        // Attempt to play as many premoves as possible while it's our turn
+        while (premoveQueue.length && isMyTurn()) {
+            var mv = premoveQueue.shift();
+            // Clear tentative visuals for premoves (we are about to play one)
+            clearTentativeMoveVisuals();
+            renderPremoveHighlights();
+
+            if (stockfishGame) {
+                // validate against current board
+                var b = stockfishGame.board;
+                var ok = b.move({ from: mv.from, to: mv.to, promotion: mv.promotion });
+                if (ok) {
+                    // we applied locally; roll back and send through existing flow which will apply the move
+                    b.undo();
+                    sendMove(mv.from, mv.to, mv.promotion);
+                    // After sendMove in stockfish mode, the move is applied immediately by handleStockfishMove and turn changes,
+                    // so continue loop will re-check isMyTurn() to decide whether to proceed to next premove.
+                } else {
+                    flashStatus('Premove illegal, skipped');
+                    // continue to next queued premove without recursion
+                    continue;
+                }
+            } else {
+                // For online/multiplayer games: perform a local optimistic update to show movement,
+                // then send the move to server. If server disagrees, it will overwrite when update arrives.
+                try {
+                    var sim = new Chess();
+                    sim.load(chessGame.fen);
+                    var applied = sim.move({ from: mv.from, to: mv.to, promotion: mv.promotion });
+                    if (applied) {
+                        // commit optimistic update locally
+                        chessGame.fen = sim.fen();
+                        chessGame.lastMove = { from: applied.from, to: applied.to };
+                        chessGame.moveHistory = chessGame.moveHistory || [];
+                        chessGame.moveHistory.push({ fen: sim.fen(), from: applied.from, to: applied.to });
+                        chessGame.historyIndex = chessGame.moveHistory.length - 1;
+                        renderBoard();
+                        // send to server
+                        sendMove(mv.from, mv.to, mv.promotion);
+                        // After sending, it's no longer our turn; break out and wait for server/opponent
+                        break;
+                    } else {
+                        flashStatus('Premove illegal, skipped');
+                        continue;
+                    }
+                } catch(e) {
+                    // If simulation fails, fallback to sending the move and let server validate
+                    sendMove(mv.from, mv.to, mv.promotion);
+                    break;
+                }
+            }
+        }
+
+    } finally {
+        __processingPremoves = false;
+    }
+}
+
+// Prevent concurrent engine fetches — mark when a fetch is in flight
 
 function attemptMove(from, to) {
     if (!chessGame || pendingPromotion) return;
-    var myTurn = chessGame.turn === chessGame.color;
-    if (!myTurn) {
-        flashStatus('Wait your turn');
-        return;
+    // Do not allow moves while viewing history
+    if (chessGame && chessGame.moveHistory && typeof chessGame.historyIndex !== 'undefined') {
+        var last = chessGame.moveHistory.length - 1;
+        if (chessGame.historyIndex !== last) { flashStatus('Return to latest position to move'); clearSelection(); return; }
     }
     if (!from || !to || from === to) return;
     var pieceCode = squarePieceCode(from);
-    if (!pieceCode) {
-        clearSelection();
-        return;
-    }
-    if (!isPlayersPiece(pieceCode)) {
-        flashStatus('Not your piece');
-        clearSelection();
-        return;
-    }
+    if (!pieceCode) { clearSelection(); return; }
+    if (!isPlayersPiece(pieceCode)) { flashStatus('Not your piece'); clearSelection(); return; }
+    var myTurn = isMyTurn();
     if (requiresPromotion(pieceCode, to)) {
-        openPromotionDialog(from, to, pieceCode);
+        // Mark promotion context
+        pendingPromotion = { from: from, to: to, color: pieceCode.charAt(0), mode: myTurn ? 'confirm' : 'premove' };
+        var options = $('#promotion-options');
+        options.empty();
+        var prefix = pendingPromotion.color;
+        ['q','r','b','n'].forEach(function(symbol) {
+            var option = $('<button type="button" class="promotion-choice" />').attr('data-promotion', symbol);
+            option.append($('<div/>').addClass('promotion-piece').addClass('piece-' + prefix + symbol));
+            options.append(option);
+        });
+        $('#chess-board .chess-square').removeClass('selected');
+        $('#chess-board .chess-square[data-square="' + from + '"]').addClass('selected');
+        $('#chess-board .chess-square[data-square="' + to + '"]').addClass('selected');
+        selectedSquare = from;
+        $('#promotion-overlay').removeClass('hidden');
     } else {
-        sendMove(from, to, null);
+        if (myTurn) {
+            stageMove(from, to, null);
+        } else {
+            enqueuePremove(from, to, null);
+        }
     }
 }
 
@@ -1041,7 +1277,6 @@ function onSquareClick() {
     var myTurn = chessGame.turn === chessGame.color;
     if (!selectedSquare) {
         if (!pieceCode) return;
-        if (!myTurn) { flashStatus('Wait your turn'); return; }
         if (!isPlayersPiece(pieceCode)) { flashStatus('Not your piece'); return; }
         selectedSquare = sq;
         $('#chess-board .chess-square').removeClass('selected');
@@ -1052,7 +1287,10 @@ function onSquareClick() {
         clearSelection();
         return;
     }
-    if (pieceCode && isPlayersPiece(pieceCode) && myTurn) {
+    if (pieceCode && isPlayersPiece(pieceCode)) {
+        // If user had a staged move, cancel it when they explicitly select a different piece
+        if (pendingUserMove) clearPendingMove();
+        clearTentativeMoveVisuals();
         selectedSquare = sq;
         $('#chess-board .chess-square').removeClass('selected');
         $(this).addClass('selected');
@@ -1063,11 +1301,15 @@ function onSquareClick() {
 
 function onPieceDragStart(e) {
     if (!chessGame || pendingPromotion) { e.preventDefault(); return; }
+    // Do not allow dragging while viewing history
+    if (chessGame && chessGame.moveHistory && typeof chessGame.historyIndex !== 'undefined') {
+        var last = chessGame.moveHistory.length - 1;
+        if (chessGame.historyIndex !== last) { flashStatus('Return to latest position to move'); e.preventDefault(); return; }
+    }
     var parentSquare = $(this).parent().data('square');
     var pieceCode = squarePieceCode(parentSquare);
     if (!pieceCode) { e.preventDefault(); return; }
     if (!isPlayersPiece(pieceCode)) { flashStatus('Not your piece'); e.preventDefault(); return; }
-    if (chessGame.turn !== chessGame.color) { flashStatus('Wait your turn'); e.preventDefault(); return; }
     dragSourceSquare = parentSquare;
     $('#chess-board .chess-square').removeClass('selected');
     $('#chess-board .chess-square[data-square="' + parentSquare + '"]').addClass('selected');
@@ -1113,9 +1355,13 @@ function onPromotionChoice() {
     var details = pendingPromotion;
     var promotion = $(this).data('promotion');
     hidePromotionDialog();
-    if (details && promotion) {
-        sendMove(details.from, details.to, promotion);
+    if (!details || !promotion) return;
+    if (details.mode === 'premove') {
+        enqueuePremove(details.from, details.to, promotion);
+    } else {
+        stageMove(details.from, details.to, promotion);
     }
+    renderPremoveHighlights();
 }
 
 function updateChessStatus() {
@@ -1123,6 +1369,94 @@ function updateChessStatus() {
     var turnName = (chessGame.turn === 'white') ? chessGame.white : chessGame.black;
     var suffix = chessGame && chessGame.inCheck ? ' (check)' : '';
     $('#chess-status').text('Turn: ' + turnName + suffix);
+}
+
+// Clear any premove preview visuals
+function clearPremovePreviews(){
+    $('#chess-board .chess-square').removeClass('premove');
+    $('#chess-board .chess-piece.premove-ghost').remove();
+}
+
+// Render premove highlights and ghost pieces indicating where queued premoves will land
+function renderPremoveHighlights(){
+    clearPremovePreviews();
+    if (!premoveQueue || !premoveQueue.length) return;
+
+    // Attempt to simulate the queued premoves on a cloned chess board so later premoves show correct targets
+    try {
+        if (typeof Chess === 'undefined') {
+            // fall back to simple highlight of destinations
+            premoveQueue.forEach(function(m){
+                try { $('#chess-board .chess-square[data-square="' + m.to + '"]').addClass('premove'); } catch(e){}
+            });
+            return;
+        }
+        var sim = new Chess();
+        try { sim.load(chessGame.fen); } catch(e) { sim = new Chess(); }
+        // For each premove, try to apply it on the simulated board and place a ghost piece on the destination
+        premoveQueue.forEach(function(m, idx){
+            try {
+                var mv = sim.move({ from: m.from, to: m.to, promotion: m.promotion });
+                if (mv) {
+                    // highlight the destination square
+                    var $to = $('#chess-board .chess-square[data-square="' + mv.to + '"]');
+                    $to.addClass('premove');
+                    // create a ghost piece representing the piece that will end up on the destination
+                    var colorPrefix = mv.color === 'w' ? 'w' : 'b';
+                    var pieceCode = colorPrefix + mv.piece; // e.g., 'wp','wn'
+                    var $ghost = $('<div/>').addClass('chess-piece premove-ghost').addClass('piece-' + pieceCode);
+                    // Add data attributes for debugging or interaction
+                    $ghost.attr('data-premove-index', idx);
+                    $ghost.attr('data-piece', pieceCode);
+                    $to.append($ghost);
+                } else {
+                    // illegal on simulated board: still mark intended destination with subtle highlight
+                    $('#chess-board .chess-square[data-square="' + m.to + '"]').addClass('premove');
+                }
+            } catch(e) {
+                try { $('#chess-board .chess-square[data-square="' + m.to + '"]').addClass('premove'); } catch(_e){}
+            }
+        });
+    } catch(e) {
+        // last-resort: highlight destinations only
+        premoveQueue.forEach(function(m){ try { $('#chess-board .chess-square[data-square="' + m.to + '"]').addClass('premove'); } catch(e){} });
+    }
+}
+
+// Cancel all queued premoves and clear visuals
+function clearAllPremoves(){
+    premoveQueue = [];
+    clearPremovePreviews();
+    clearTentativeMoveVisuals();
+    flashStatus('All premoves cancelled');
+    // re-render board to ensure consistency
+    renderBoard();
+}
+
+// Show a tentative visual of a move (does not change game state)
+function showTentativeMove(from, to, isPremove){
+    try {
+        clearTentativeMoveVisuals();
+        var $fromSq = $('#chess-board .chess-square[data-square="' + from + '"]');
+        var $toSq = $('#chess-board .chess-square[data-square="' + to + '"]');
+        if (!$fromSq.length || !$toSq.length) return;
+        var $piece = $fromSq.find('.chess-piece').first();
+        if (!$piece.length) return;
+        // mark source as tentative (hide/ghost)
+        $fromSq.addClass('tentative-source');
+        $toSq.addClass('tentative-target');
+        // clone piece into target as tentative-piece
+        var cls = '';
+        $.each($piece.attr('class').split(/\s+/), function(i,c){ if (c.indexOf('piece-') === 0) cls = c; });
+        var $clone = $('<div/>').addClass('chess-piece tentative-piece').addClass(cls);
+        $toSq.append($clone);
+    } catch(e){}
+}
+
+function clearTentativeMoveVisuals(){
+    $('#chess-board .chess-square').removeClass('tentative-source tentative-target');
+    $('#chess-board .chess-piece.tentative-piece').remove();
+    currentTentative = null;
 }
 
 function flashStatus(text) {
@@ -1148,7 +1482,7 @@ function ready() {
         if (clicktoclosepopup)
             $(document).on('click keydown', function() { $(document).off('click keydown'); $('#popup').addClass('hidden'); $('body > *:not(#popup)').removeClass('opaque'); });
         else if (clicktoreload)
-            $(document).on('click keydown', function() { $(document).off('click keydown'); $(document).off('keydown'); ws.close(); ready(); });
+            $(document).on('click keydown', function() { $(document).off('click keydown'); $(document).off('keydown'); try { if (ws && typeof ws.close === 'function') ws.close(); } catch(e){} try { ready(); } catch(e){} });
     }
 
     if (!window.WebSocket) {
@@ -1211,14 +1545,15 @@ function ready() {
 
         loop = setInterval(function() {
             if (!ws || ws.readyState !== 1) return;
-            ws.send('ping');
+            try { ws.send('ping'); } catch(e) { console.warn('ws.send ping failed', e); }
             if (Date.now() - lastPong > 10000) { // disconnected from internet or phone idle mode; in both cases, ws.readyState can be 1 (OPEN) so we can't use that
-                ws.send('ping');   // this is your last chance ! we send a packet now, and if in 1 second, nothings happen, this means we're dead
+                try { ws.send('ping'); } catch(e) { console.warn('ws.send ping failed', e); }   // this is your last chance ! we send a packet now, and if in 1 second, nothings happen, this means we're dead
                 setTimeout( function() {
                     if (Date.now() - lastPong > 10000)  // you missed your last chance !
                         popup_message('Click anywhere or press any key to reload the page.', false, true);     // disconnected from internet
-                    else                                // ok the phone was just idle, let's resume
-                        ws.send(JSON.stringify({ "type" : "username", "username" : $('#username').text() }));  // let's send username again, so that other users see me
+                    else {                               // ok the phone was just idle, let's resume
+                        try { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ "type" : "username", "username" : $('#username').text() })); } catch(e) { console.warn('ws.send username failed', e); }
+                    }
                 }, 1000);
             }
         }, 5000);
@@ -1465,6 +1800,34 @@ function ready() {
             try { localStorage.setItem('active_game', JSON.stringify({ id: chessGame.id, white: chessGame.white, black: chessGame.black })); } catch(e){}
         }
     });
+    $('#chess-confirm-move').on('click', function(){
+        if (!pendingUserMove) return;
+        var m = pendingUserMove; clearPendingMove();
+        sendMove(m.from, m.to, m.promotion);
+    });
+
+    // Keyboard: Enter confirms staged move (unless typing in inputs)
+    $(document).on('keydown.chessconfirm', function(e){
+        // ignore when focus is in chat input or any text input
+        var active = document.activeElement;
+        if ($(active).is('textarea, input') || $(active).closest('#promotion-overlay').length) return;
+        if (!$('#chess-modal').length || $('#chess-modal').hasClass('hidden')) return;
+
+        if (e.key === 'Enter' && !e.shiftKey) {
+            if (pendingUserMove && !$('#chess-confirm-move').prop('disabled')) {
+                e.preventDefault();
+                $('#chess-confirm-move').trigger('click');
+            }
+            return;
+        }
+
+        // Cancel all premoves on Left Arrow or Backspace
+        if (e.key === 'ArrowLeft' || e.key === 'Backspace') {
+            e.preventDefault();
+            clearAllPremoves();
+            return;
+        }
+    });
     $('#chess-resign').on('click', function(){
         if (stockfishGame) {
             stockfishGame.over = true;
@@ -1491,6 +1854,48 @@ function ready() {
         .on('drop', '.chess-square', onSquareDrop);
     $('#promotion-options').on('click', '.promotion-choice', onPromotionChoice);
     $('#promotion-cancel').on('click', function(){ hidePromotionDialog(); });
+
+    // history controls
+    $('#chess-prev').on('click', function(){
+        if (!chessGame || !chessGame.moveHistory) return;
+        var idx = chessGame.historyIndex || 0;
+        if (idx <= 0) return;
+        chessGame.historyIndex = idx - 1;
+        var entry = chessGame.moveHistory[chessGame.historyIndex];
+        chessGame.fen = entry.fen;
+        renderBoard();
+        updateChessStatus();
+        updateHistoryControls();
+    });
+    $('#chess-next').on('click', function(){
+        if (!chessGame || !chessGame.moveHistory) return;
+        var idx = chessGame.historyIndex || 0;
+        var last = chessGame.moveHistory.length - 1;
+        if (idx >= last) return;
+        chessGame.historyIndex = idx + 1;
+        var entry = chessGame.moveHistory[chessGame.historyIndex];
+        chessGame.fen = entry.fen;
+        renderBoard();
+        updateChessStatus();
+        updateHistoryControls();
+    });
+
+    function updateHistoryControls(){
+        if (!chessGame || !chessGame.moveHistory) return;
+        var idx = chessGame.historyIndex || 0;
+        var last = chessGame.moveHistory.length - 1;
+        $('#chess-prev').prop('disabled', idx <= 0);
+        $('#chess-next').prop('disabled', idx >= last);
+        // when viewing not-latest, block making moves
+        if (idx < last) {
+            // show visual hint
+            $('#chess-status').text('Viewing move ' + idx + ' of ' + last + ' (use arrows to return)');
+        } else {
+            updateChessStatus();
+        }
+    }
+    // expose to global so other non-closure code can call it
+    try { window.updateHistoryControls = updateHistoryControls; } catch(e){}
 
     // Rejoin button handler (delegated)
     $('#invites').on('click', '#rejoin-game', function(){
@@ -1544,13 +1949,17 @@ function ready() {
             fen: data['fen'],
             turn: data['turn'],
             lastMove: null,
-            over: false
+            over: false,
+            moveHistory: [{ fen: data['fen'], from: null, to: null }],
+            historyIndex: 0
         };
         hideRejoinPrompt();
         $('#chess-white').text(chessGame.white);
         $('#chess-black').text(chessGame.black);
         $('#chess-status').text('Your color: ' + chessGame.color);
+        pendingUserMove = null; premoveQueue = []; updateConfirmButton();
         renderBoard();
+        updateHistoryControls && updateHistoryControls();
         $('#chess-modal').removeClass('hidden');
     }
 
@@ -1649,6 +2058,7 @@ function ready() {
             try { localStorage.setItem('active_game', JSON.stringify({ id: chessGame.id, white: chessGame.white, black: chessGame.black })); } catch(e){}
             $('#chess-white').text(chessGame.white);
             $('#chess-black').text(chessGame.black);
+            pendingUserMove = null; premoveQueue = []; updateConfirmButton();
             showRejoinPrompt();
         }
         else if (data['type'] === 'chess_start') {
@@ -1661,8 +2071,15 @@ function ready() {
                 chessGame.turn = data['turn'];
                 chessGame.inCheck = !!data['check'];
                 chessGame.lastMove = { from: data['from'], to: data['to'] };
+                // push history
+                chessGame.moveHistory = chessGame.moveHistory || [];
+                chessGame.moveHistory.push({ fen: data['fen'], from: data['from'], to: data['to'] });
+                chessGame.historyIndex = chessGame.moveHistory.length - 1;
                 renderBoard();
                 updateChessStatus();
+                updateHistoryControls && updateHistoryControls();
+                clearPendingMove();
+                tryPlayPremoves();
                 if (document.hidden && chessGame.turn === chessGame.color) { __chessUnread += 1; __updateTitleBadge(); }
             }
         }
@@ -1710,6 +2127,33 @@ function ready() {
 
 $(document).ready(ready);
 
+</script>
+<script>
+// Global handlers to suppress/handle external iframe evaluation timeouts (e.g. from builder.io CDN)
+window.addEventListener('unhandledrejection', function(ev) {
+  try {
+    var reason = ev && ev.reason ? ev.reason : ev;
+    var msg = (reason && reason.message) ? reason.message : String(reason);
+    if (msg && (msg.indexOf('IFrame evaluation timeout') !== -1 || msg.indexOf('cdn.builder.io') !== -1 || msg.indexOf('IFrame evaluation') !== -1)) {
+      // Non-fatal external iframe timeout from third-party script — log and prevent uncaught rejection
+      console.warn('Suppressed external iframe error:', msg, reason);
+      ev.preventDefault && ev.preventDefault();
+      return;
+    }
+  } catch (e) { /* ignore */ }
+});
+
+window.addEventListener('error', function(ev) {
+  try {
+    var msg = ev && ev.message ? ev.message : '';
+    if (msg && (msg.indexOf('IFrame evaluation timeout') !== -1 || msg.indexOf('cdn.builder.io') !== -1 || msg.indexOf('IFrame evaluation') !== -1)) {
+      // Log and swallow to avoid noisy uncaught errors originating from injected third-party iframes
+      console.warn('Suppressed external iframe error (window.error):', msg, ev.error || ev);
+      ev.stopImmediatePropagation && ev.stopImmediatePropagation();
+      return true;
+    }
+  } catch (e) { /* ignore */ }
+});
 </script>
 </body>
 </html>
