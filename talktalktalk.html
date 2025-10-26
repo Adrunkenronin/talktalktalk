@@ -884,27 +884,37 @@ function renderBoard() {
     }
     dragSourceSquare = null;
 
-    var parts = chessGame.fen.split(' ');
-    var ranksFEN = parts[0].split('/');
-    var files = ['a','b','c','d','e','f','g','h'];
-    var mapPiece = { 'P':'wp','N':'wn','B':'wb','R':'wr','Q':'wq','K':'wk','p':'bp','n':'bn','b':'bb','r':'br','q':'bq','k':'bk' };
-    chessGame.squareMap = {};
-    for (var r = 0; r < 8; r++) {
-        var row = ranksFEN[r];
-        var fileIndex = 0;
-        for (var i = 0; i < row.length; i++) {
-            var ch = row[i];
-            if (/[1-8]/.test(ch)) {
-                fileIndex += parseInt(ch, 10);
-            } else {
-                var file = files[fileIndex];
-                var rank = 8 - r; // FEN rows start at rank 8
-                var sq = file + String(rank);
-                var pieceCode = mapPiece[ch] || null;
-                if (pieceCode) chessGame.squareMap[sq] = pieceCode;
-                fileIndex++;
+    try {
+        var parts = chessGame.fen.split(' ');
+        var ranksFEN = parts[0].split('/');
+        if (!ranksFEN || ranksFEN.length !== 8) {
+            console.error('Invalid FEN: expected 8 ranks, got ' + (ranksFEN ? ranksFEN.length : 0));
+            return;
+        }
+        var files = ['a','b','c','d','e','f','g','h'];
+        var mapPiece = { 'P':'wp','N':'wn','B':'wb','R':'wr','Q':'wq','K':'wk','p':'bp','n':'bn','b':'bb','r':'br','q':'bq','k':'bk' };
+        chessGame.squareMap = {};
+        for (var r = 0; r < 8; r++) {
+            var row = ranksFEN[r];
+            if (!row) continue;
+            var fileIndex = 0;
+            for (var i = 0; i < row.length; i++) {
+                var ch = row[i];
+                if (/[1-8]/.test(ch)) {
+                    fileIndex += parseInt(ch, 10);
+                } else {
+                    var file = files[fileIndex];
+                    var rank = 8 - r; // FEN rows start at rank 8
+                    var sq = file + String(rank);
+                    var pieceCode = mapPiece[ch] || null;
+                    if (pieceCode) chessGame.squareMap[sq] = pieceCode;
+                    fileIndex++;
+                }
             }
         }
+    } catch (e) {
+        console.error('Error in renderBoard:', e);
+        return;
     }
 
     function appendSquare(sq) {
