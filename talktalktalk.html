@@ -860,7 +860,7 @@ function makeStockfishMove(bestmove, retries) {
             return r.json();
         }).then(function(resp){
             if (resp && resp.bestmove) { makeStockfishMove(resp.bestmove); }
-            else if (resp && resp.error && retries < 2) {
+            else if (resp && resp.error && retries < 3) {
                 setTimeout(function() { makeStockfishMove(null, retries + 1); }, 500);
             }
             else {
@@ -868,7 +868,7 @@ function makeStockfishMove(bestmove, retries) {
             }
         }).catch(function(err){
             clearTimeout(timeoutId);
-            if (retries < 2) {
+            if (retries < 3) {
                 setTimeout(function() { makeStockfishMove(null, retries + 1); }, 500);
             } else {
                 $('#chess-status').text('Engine error, please reload');
