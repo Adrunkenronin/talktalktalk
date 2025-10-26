@@ -2024,7 +2024,7 @@ function ready() {
             if (isscrolledend)
                 scroll_end();
             if (data['username'] !== $('#username').text() && data['username'] !== displayeduser && $('#notificationswitch').text() === 'on') {
-                
+                playNotificationSound();
             }
             if (document.hidden && data['username'] !== $('#username').text()) {
                 __unread += 1; __updateTitleBadge();
