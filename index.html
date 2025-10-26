@@ -1151,27 +1151,60 @@ function tryPlayPremoves(){
     __processingPremoves = true;
     try {
         if (!chessGame || !premoveQueue.length) return;
-        if (!isMyTurn()) return;
-        var mv = premoveQueue.shift();
-        // Clear tentative visuals for premoves (we are about to play one)
-        clearTentativeMoveVisuals();
-        renderPremoveHighlights();
-        if (stockfishGame) {
-            // validate against current board
-            var b = stockfishGame.board;
-            var ok = b.move({ from: mv.from, to: mv.to, promotion: mv.promotion });
-            if (ok) {
-                // we applied locally; roll back and send through existing flow
-                b.undo();
-                sendMove(mv.from, mv.to, mv.promotion);
+
+        // Attempt to play as many premoves as possible while it's our turn
+        while (premoveQueue.length && isMyTurn()) {
+            var mv = premoveQueue.shift();
+            // Clear tentative visuals for premoves (we are about to play one)
+            clearTentativeMoveVisuals();
+            renderPremoveHighlights();
+
+            if (stockfishGame) {
+                // validate against current board
+                var b = stockfishGame.board;
+                var ok = b.move({ from: mv.from, to: mv.to, promotion: mv.promotion });
+                if (ok) {
+                    // we applied locally; roll back and send through existing flow which will apply the move
+                    b.undo();
+                    sendMove(mv.from, mv.to, mv.promotion);
+                    // After sendMove in stockfish mode, the move is applied immediately by handleStockfishMove and turn changes,
+                    // so continue loop will re-check isMyTurn() to decide whether to proceed to next premove.
+                } else {
+                    flashStatus('Premove illegal, skipped');
+                    // continue to next queued premove without recursion
+                    continue;
+                }
             } else {
-                flashStatus('Premove illegal, skipped');
-                // Use setTimeout to avoid deep recursive calls
-                setTimeout(function(){ tryPlayPremoves(); }, 0);
+                // For online/multiplayer games: perform a local optimistic update to show movement,
+                // then send the move to server. If server disagrees, it will overwrite when update arrives.
+                try {
+                    var sim = new Chess();
+                    sim.load(chessGame.fen);
+                    var applied = sim.move({ from: mv.from, to: mv.to, promotion: mv.promotion });
+                    if (applied) {
+                        // commit optimistic update locally
+                        chessGame.fen = sim.fen();
+                        chessGame.lastMove = { from: applied.from, to: applied.to };
+                        chessGame.moveHistory = chessGame.moveHistory || [];
+                        chessGame.moveHistory.push({ fen: sim.fen(), from: applied.from, to: applied.to });
+                        chessGame.historyIndex = chessGame.moveHistory.length - 1;
+                        renderBoard();
+                        // send to server
+                        sendMove(mv.from, mv.to, mv.promotion);
+                        // After sending, it's no longer our turn; break out and wait for server/opponent
+                        break;
+                    } else {
+                        flashStatus('Premove illegal, skipped');
+                        continue;
+                    }
+                } catch(e) {
+                    // If simulation fails, fallback to sending the move and let server validate
+                    sendMove(mv.from, mv.to, mv.promotion);
+                    break;
+                }
             }
-        } else {
-            sendMove(mv.from, mv.to, mv.promotion);
         }
+
     } finally {
         __processingPremoves = false;
     }
