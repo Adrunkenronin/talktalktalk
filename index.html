@@ -696,8 +696,7 @@ var __audioUnmuted = false; // Track if audio has been unmuted after user intera
 
 // Safe audio playback function that handles autoplay policy restrictions
 function playNotificationSound() {
-    if (!popsound) return;
-    if (!__audioUnmuted) {
+    if (!popsound || !__audioUnmuted) {
         return;
     }
     try {
@@ -705,11 +704,11 @@ function playNotificationSound() {
         var playPromise = popsound.play();
         if (playPromise !== undefined) {
             playPromise.catch(function(error) {
-                console.warn('Audio playback failed:', error);
+                // Silently handle playback errors that may occur due to browser policies
             });
         }
     } catch (e) {
-        console.warn('Error playing notification sound:', e);
+        // Silently handle exceptions
     }
 }
 
