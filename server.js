@@ -121,7 +121,75 @@ function eloToDepth(elo) {
 }
 
 async function bestMoveWithStockfish(fen, depth) {
-  return null;
+  // Try to use the stockfish npm package when available. This runs the engine in-process
+  // and returns the bestmove string (e.g. 'e2e4' or 'e7e8q'). Will timeout and return null
+  // on failure so caller can fallback to the JS fallback engine.
+  try {
+    if (!StockfishFactory) {
+      try { StockfishFactory = require('stockfish'); } catch (e) { StockfishFactory = null; }
+    }
+    if (!StockfishFactory) return null;
+
+    const engine = StockfishFactory();
+    return await new Promise((resolve) => {
+      let settled = false;
+      const cleanup = () => {
+        try {
+          if (engine.postMessage) engine.postMessage('quit');
+        } catch (_) {}
+      };
+
+      const onMessage = (ev) => {
+        const msg = typeof ev === 'string' ? ev : (ev && ev.data ? ev.data : '');
+        if (!msg) return;
+        // console.log('[stockfish] msg', msg);
+        if (msg.indexOf('bestmove') === 0) {
+          const parts = msg.split(' ');
+          const mv = parts[1] || null;
+          if (!settled) {
+            settled = true;
+            cleanup();
+            resolve(mv);
+          }
+        }
+      };
+
+      try {
+        if (typeof engine.onmessage !== 'undefined') engine.onmessage = onMessage;
+        if (typeof engine.addEventListener === 'function') engine.addEventListener('message', onMessage);
+      } catch (_) {}
+
+      // Safety limits
+      const safeDepth = Math.max(1, Math.min(Number(depth) || 8, 12));
+      try {
+        engine.postMessage('uci');
+        engine.postMessage('isready');
+        engine.postMessage('position fen ' + fen);
+        engine.postMessage('go depth ' + safeDepth);
+      } catch (e) {
+        // Some builds expect .postMessage while others are functions. Try function-style too.
+        try {
+          engine('uci'); engine('isready'); engine('position fen ' + fen); engine('go depth ' + safeDepth);
+        } catch (e2) {}
+      }
+
+      // Timeout after 3s
+      const to = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          try { cleanup(); } catch (_) {}
+          resolve(null);
+        }
+      }, 3000);
+
+      // When resolved, clear timeout
+      const origResolve = resolve;
+      resolve = (v) => { clearTimeout(to); origResolve(v); };
+    });
+  } catch (e) {
+    console.error('[stockfish] engine integration error', e && e.stack ? e.stack : e);
+    return null;
+  }
 }
 
 function evaluateBoardMaterial(chess) {
