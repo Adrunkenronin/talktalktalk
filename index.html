@@ -811,7 +811,9 @@ function startStockfishGame(playerColor, elo) {
         fen: board.fen(),
         turn: 'white',
         lastMove: null,
-        over: false
+        over: false,
+        moveHistory: [{ fen: board.fen(), from: null, to: null }],
+        historyIndex: 0
     };
     $('#chess-white').text(chessGame.white);
     $('#chess-black').text(chessGame.black);
