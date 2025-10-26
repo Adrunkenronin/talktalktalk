@@ -487,6 +487,9 @@ html {
 /* Premove highlight (slightly red, like chess.com) */
 .chess-square.premove { box-shadow: inset 0 0 0 3px rgba(220, 53, 69, 0.35); }
 .chess-square.premove::after { content: ''; position: absolute; inset: 0; background: rgba(220, 53, 69, 0.08); pointer-events: none; }
+/* Tentative move visuals */
+.chess-square.tentative-source .chess-piece { opacity: 0.08 !important; }
+.chess-piece.tentative-piece { position: absolute; inset: 0; background-position: center; background-repeat: no-repeat; background-size: 80% auto; pointer-events: none; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25)); opacity: 0.95; transform: translateZ(0); }
 
 /* Pieces (Staunton-style via external assets) */
 .chess-piece { position: absolute; inset: 0; background-position: center; background-repeat: no-repeat; background-size: 80% auto; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25)); pointer-events: auto; cursor: grab; }
@@ -702,6 +705,7 @@ var dragSourceSquare = null;
 var pendingPromotion = null;
 var pendingUserMove = null; // {from,to,promotion}
 var premoveQueue = [];
+var currentTentative = null; // {from,to,isPremove}
 
 // Stockfish state
 var stockfishGame = null; // {fen, turn, color, engineColor, elo, over}
@@ -955,6 +959,15 @@ function renderBoard() {
     }
     // Re-apply premove highlights after board render
     renderPremoveHighlights();
+    // Re-apply any tentative visuals (staged move or latest premove)
+    if (pendingUserMove && pendingUserMove.from && pendingUserMove.to) {
+        currentTentative = { from: pendingUserMove.from, to: pendingUserMove.to, isPremove: false };
+        showTentativeMove(pendingUserMove.from, pendingUserMove.to);
+    } else if (premoveQueue && premoveQueue.length) {
+        var last = premoveQueue[premoveQueue.length - 1];
+        currentTentative = { from: last.from, to: last.to, isPremove: true };
+        showTentativeMove(last.from, last.to, true);
+    }
 }
 
 function squarePieceCode(sq) {
@@ -1036,13 +1049,18 @@ function updateConfirmButton(){
 function clearPendingMove(){
     pendingUserMove = null;
     updateConfirmButton();
+    clearTentativeMoveVisuals();
 }
 
 function stageMove(from, to, promotion){
+    // Clear existing tentative visuals
+    clearTentativeMoveVisuals();
     pendingUserMove = { from: from, to: to, promotion: promotion || null };
     $('#chess-board .chess-square').removeClass('selected');
     $('#chess-board .chess-square[data-square="' + from + '"]').addClass('selected');
     $('#chess-board .chess-square[data-square="' + to + '"]').addClass('selected');
+    currentTentative = { from: from, to: to, isPremove: false };
+    showTentativeMove(from, to);
     updateConfirmButton();
     flashStatus('Move ready. Press Confirm');
 }
@@ -1050,6 +1068,11 @@ function stageMove(from, to, promotion){
 function enqueuePremove(from, to, promotion){
     premoveQueue.push({ from: from, to: to, promotion: promotion || null });
     flashStatus('Premove queued');
+    // Show the latest premove as tentative visual
+    var mv = premoveQueue[premoveQueue.length - 1];
+    clearTentativeMoveVisuals();
+    currentTentative = { from: mv.from, to: mv.to, isPremove: true };
+    showTentativeMove(mv.from, mv.to, true);
     renderPremoveHighlights();
 }
 
@@ -1062,6 +1085,8 @@ function tryPlayPremoves(){
     if (!chessGame || !premoveQueue.length) return;
     if (!isMyTurn()) return;
     var mv = premoveQueue.shift();
+    // Clear tentative visuals for premoves (we are about to play one)
+    clearTentativeMoveVisuals();
     renderPremoveHighlights();
     if (stockfishGame) {
         // validate against current board
@@ -1130,6 +1155,9 @@ function onSquareClick() {
         return;
     }
     if (pieceCode && isPlayersPiece(pieceCode)) {
+        // If user had a staged move, cancel it when they explicitly select a different piece
+        if (pendingUserMove) clearPendingMove();
+        clearTentativeMoveVisuals();
         selectedSquare = sq;
         $('#chess-board .chess-square').removeClass('selected');
         $(this).addClass('selected');
@@ -1216,6 +1244,32 @@ function renderPremoveHighlights(){
             $('#chess-board .chess-square[data-square="' + m.from + '"]').addClass('premove');
         } catch(e){}
     });
+}
+
+// Show a tentative visual of a move (does not change game state)
+function showTentativeMove(from, to, isPremove){
+    try {
+        clearTentativeMoveVisuals();
+        var $fromSq = $('#chess-board .chess-square[data-square="' + from + '"]');
+        var $toSq = $('#chess-board .chess-square[data-square="' + to + '"]');
+        if (!$fromSq.length || !$toSq.length) return;
+        var $piece = $fromSq.find('.chess-piece').first();
+        if (!$piece.length) return;
+        // mark source as tentative (hide/ghost)
+        $fromSq.addClass('tentative-source');
+        $toSq.addClass('tentative-target');
+        // clone piece into target as tentative-piece
+        var cls = '';
+        $.each($piece.attr('class').split(/\s+/), function(i,c){ if (c.indexOf('piece-') === 0) cls = c; });
+        var $clone = $('<div/>').addClass('chess-piece tentative-piece').addClass(cls);
+        $toSq.append($clone);
+    } catch(e){}
+}
+
+function clearTentativeMoveVisuals(){
+    $('#chess-board .chess-square').removeClass('tentative-source tentative-target');
+    $('#chess-board .chess-piece.tentative-piece').remove();
+    currentTentative = null;
 }
 
 function flashStatus(text) {
