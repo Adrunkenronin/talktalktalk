@@ -140,7 +140,22 @@ function bestMoveFallback(fen, depth) {
   try { chess.load(fen); } catch (_) { return null; }
   const maxDepth = Math.max(1, Number(depth) || 5);
   const player = chess.turn();
+  const startTime = Date.now();
+  const maxTime = Math.min(5000, 500 + depth * 100); // Adaptive timeout: 500ms base + 100ms per depth level, max 5s
+  let nodeCount = 0;
+  const maxNodes = 50000; // Stop after evaluating this many positions
+
   function negamax(d, alpha, beta) {
+    nodeCount++;
+    // Check time and node limits periodically (every 256 nodes for performance)
+    if ((nodeCount & 255) === 0) {
+      if (Date.now() - startTime > maxTime || nodeCount > maxNodes) {
+        // Time budget exceeded, return quick evaluation
+        const evalScore = evaluateBoardMaterial(chess);
+        return player === 'w' ? evalScore : -evalScore;
+      }
+    }
+
     if (d === 0 || chess.game_over()) {
       const evalScore = evaluateBoardMaterial(chess);
       return player === 'w' ? evalScore : -evalScore;
