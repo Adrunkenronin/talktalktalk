@@ -1789,6 +1789,7 @@ function ready() {
         $('#chess-status').text('Your color: ' + chessGame.color);
         pendingUserMove = null; premoveQueue = []; updateConfirmButton();
         renderBoard();
+        updateHistoryControls && updateHistoryControls();
         $('#chess-modal').removeClass('hidden');
     }
 
