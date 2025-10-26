@@ -102,19 +102,22 @@ function eloToDepth(elo) {
     { elo: 2400, depth: 18 }
   ];
 
-  if (rating <= eloDepthMap[0].elo) return eloDepthMap[0].depth;
-  if (rating >= eloDepthMap[eloDepthMap.length - 1].elo) return eloDepthMap[eloDepthMap.length - 1].depth;
-
-  for (let i = 0; i < eloDepthMap.length - 1; i++) {
-    if (rating >= eloDepthMap[i].elo && rating <= eloDepthMap[i + 1].elo) {
-      const lower = eloDepthMap[i];
-      const upper = eloDepthMap[i + 1];
-      const ratio = (rating - lower.elo) / (upper.elo - lower.elo);
-      return Math.round(lower.depth + (upper.depth - lower.depth) * ratio);
+  let depthOut = 8;
+  if (rating <= eloDepthMap[0].elo) depthOut = eloDepthMap[0].depth;
+  else if (rating >= eloDepthMap[eloDepthMap.length - 1].elo) depthOut = eloDepthMap[eloDepthMap.length - 1].depth;
+  else {
+    for (let i = 0; i < eloDepthMap.length - 1; i++) {
+      if (rating >= eloDepthMap[i].elo && rating <= eloDepthMap[i + 1].elo) {
+        const lower = eloDepthMap[i];
+        const upper = eloDepthMap[i + 1];
+        const ratio = (rating - lower.elo) / (upper.elo - lower.elo);
+        depthOut = Math.round(lower.depth + (upper.depth - lower.depth) * ratio);
+        break;
+      }
     }
   }
-
-  return 8;
+  // Cap to a safe maximum to avoid CPU spikes
+  return Math.min(depthOut, 8);
 }
 
 async function bestMoveWithStockfish(fen, depth) {
@@ -138,10 +141,14 @@ function evaluateBoardMaterial(chess) {
 function bestMoveFallback(fen, depth) {
   const chess = new ChessCtor();
   try { chess.load(fen); } catch (_) { return null; }
-  const maxDepth = Math.max(1, Number(depth) || 5);
+  const maxDepth = Math.max(1, Math.min(Number(depth) || 5, 8));
+  const deadline = Date.now() + 900; // ms budget per move
   const player = chess.turn();
+
+  function timeUp() { return Date.now() > deadline; }
+
   function negamax(d, alpha, beta) {
-    if (d === 0 || chess.game_over()) {
+    if (d === 0 || chess.game_over() || timeUp()) {
       const evalScore = evaluateBoardMaterial(chess);
       return player === 'w' ? evalScore : -evalScore;
     }
@@ -154,13 +161,16 @@ function bestMoveFallback(fen, depth) {
       if (score > best) best = score;
       if (score > alpha) alpha = score;
       if (alpha >= beta) break;
+      if (timeUp()) break;
     }
     return best;
   }
+
   let bestMove = null;
   let bestScore = -Infinity;
   const moves = chess.moves({ verbose: true });
   for (const m of moves) {
+    if (timeUp()) break;
     chess.move(m);
     const score = -negamax(maxDepth - 1, -Infinity, Infinity);
     chess.undo();
