@@ -703,7 +703,25 @@ html {
 </div>
 <script type="text/javascript">
 var popsound = new Audio('popsound.mp3');
-// API base: if page is opened via file:// fallback to localhost dev server
+popsound.muted = true; // Mute initially to comply with browser autoplay policies
+var __audioUnmuted = false; // Track if audio has been unmuted after user interaction
+
+// Safe audio playback function that handles autoplay policy restrictions
+function playNotificationSound() {
+    if (!popsound || $('#notificationswitch').text() !== 'on') return;
+    try {
+        popsound.currentTime = 0;
+        var playPromise = popsound.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(function(error) {
+                console.warn('Audio playback failed:', error);
+            });
+        }
+    } catch (e) {
+        console.warn('Error playing notification sound:', e);
+    }
+}
+
 var API_BASE = (location.protocol === 'file:') ? (window.__API_BASE_OVERRIDE__ || 'http://localhost:12000') : '';
 var randomname = 'user' + Math.floor((Math.random() * 1000) + 1);
 var displayeduser;
@@ -1472,6 +1490,17 @@ function ready() {
     firstId = Infinity;
     lastId = -1;
 
+    // Unmute audio on first user interaction to comply with browser autoplay policies
+    function unmuteAudioOnInteraction() {
+        if (!__audioUnmuted) {
+            popsound.muted = false;
+            __audioUnmuted = true;
+            // Remove listeners after first interaction
+            $(document).off('click.audio keydown.audio');
+        }
+    }
+    $(document).on('click.audio keydown.audio', unmuteAudioOnInteraction);
+
     if (mediaPlaybackRequiresUserGesture()) { // mobile devices require user gesture to trigger a play. "Notifications" off for them.
         $('#notificationswitch').text('off');
     }
@@ -1995,7 +2024,7 @@ function ready() {
             if (isscrolledend)
                 scroll_end();
             if (data['username'] !== $('#username').text() && data['username'] !== displayeduser && $('#notificationswitch').text() === 'on') {
-                
+                playNotificationSound();
             }
             if (document.hidden && data['username'] !== $('#username').text()) {
                 __unread += 1; __updateTitleBadge();
