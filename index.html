@@ -1136,28 +1136,37 @@ function isMyTurn(){
 }
 
 function tryPlayPremoves(){
-    if (!chessGame || !premoveQueue.length) return;
-    if (!isMyTurn()) return;
-    var mv = premoveQueue.shift();
-    // Clear tentative visuals for premoves (we are about to play one)
-    clearTentativeMoveVisuals();
-    renderPremoveHighlights();
-    if (stockfishGame) {
-        // validate against current board
-        var b = stockfishGame.board;
-        var ok = b.move({ from: mv.from, to: mv.to, promotion: mv.promotion });
-        if (ok) {
-            // we applied locally; roll back and send through existing flow
-            b.undo();
-            sendMove(mv.from, mv.to, mv.promotion);
+    if (__processingPremoves) return; // avoid re-entrancy
+    __processingPremoves = true;
+    try {
+        if (!chessGame || !premoveQueue.length) return;
+        if (!isMyTurn()) return;
+        var mv = premoveQueue.shift();
+        // Clear tentative visuals for premoves (we are about to play one)
+        clearTentativeMoveVisuals();
+        renderPremoveHighlights();
+        if (stockfishGame) {
+            // validate against current board
+            var b = stockfishGame.board;
+            var ok = b.move({ from: mv.from, to: mv.to, promotion: mv.promotion });
+            if (ok) {
+                // we applied locally; roll back and send through existing flow
+                b.undo();
+                sendMove(mv.from, mv.to, mv.promotion);
+            } else {
+                flashStatus('Premove illegal, skipped');
+                // Use setTimeout to avoid deep recursive calls
+                setTimeout(function(){ tryPlayPremoves(); }, 0);
+            }
         } else {
-            flashStatus('Premove illegal, skipped');
-            tryPlayPremoves();
+            sendMove(mv.from, mv.to, mv.promotion);
         }
-    } else {
-        sendMove(mv.from, mv.to, mv.promotion);
+    } finally {
+        __processingPremoves = false;
     }
 }
+
+// Prevent concurrent engine fetches — mark when a fetch is in flight
 
 function attemptMove(from, to) {
     if (!chessGame || pendingPromotion) return;
