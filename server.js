@@ -147,31 +147,11 @@ app.post('/api/stockfish/move', async (req, res) => {
   if (!depth) depth = 8;
 
   try {
-    let best = null;
-    let responseTimeout = false;
-
-    const timeoutPromise = new Promise((resolve) => {
-      setTimeout(() => {
-        responseTimeout = true;
-        resolve(null);
-      }, 8000);
-    });
-
-    best = await Promise.race([
-      bestMoveWithStockfish(fen, depth),
-      timeoutPromise
-    ]);
-
-    if (!best) best = bestMoveFallback(fen, depth);
+    const best = bestMoveFallback(fen, depth);
     if (!best) return res.status(422).json({ error: 'no_move' });
-
-    if (!responseTimeout && res.headersSent === false) {
-      res.json({ bestmove: best });
-    }
+    res.json({ bestmove: best });
   } catch (e) {
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'engine_error' });
-    }
+    res.status(500).json({ error: 'engine_error' });
   }
 });
 
