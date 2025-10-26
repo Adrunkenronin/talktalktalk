@@ -105,7 +105,8 @@ async function getBestMoveFromLichess(fen, elo) {
     });
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    // Give Lichess 8 seconds to respond (with network overhead)
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     const response = await fetch(`${LICHESS_EVAL_URL}?${params}`, {
       method: 'GET',
