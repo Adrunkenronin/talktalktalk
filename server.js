@@ -1,4 +1,3 @@
-const express = require('express');
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
@@ -121,62 +120,107 @@ function eloToDepth(elo) {
   return Math.min(depthOut, 8);
 }
 
-async function bestMoveWithStockfish(fen, depth) {
-  // First try bundled npm package if available
+async function bestMoveWithStockfish(fen, depth, elo) {
+  // Use UCI options (limit strength), request MultiPV, use movetime with jitter, and sample top PVs
   try {
+    function computeMoveTime(eloVal, depthVal) {
+      const e = Number(eloVal) || 1200;
+      const mt = Math.round(200 + (Math.max(400, Math.min(2400, e)) - 400) / (2400 - 400) * 1800);
+      const depthBoost = Math.max(0, (Number(depthVal) || 8) - 8) * 150;
+      return Math.min(5000, mt + depthBoost);
+    }
+    const movetime = computeMoveTime(elo, depth);
+    const multipv = 3;
+
     if (!StockfishFactory) {
       try { StockfishFactory = require('stockfish'); } catch (e) { StockfishFactory = null; }
     }
+
+    const sampleMove = (cands) => {
+      if (!cands || cands.length === 0) return null;
+      if (cands.length === 1) return cands[0];
+      const weights = cands.map((_, i) => (i === 0 ? 0.7 : i === 1 ? 0.2 : 0.1));
+      const total = weights.slice(0, cands.length).reduce((a, b) => a + b, 0);
+      let r = Math.random() * total;
+      for (let i = 0; i < cands.length; i++) {
+        r -= weights[i];
+        if (r <= 0) return cands[i];
+      }
+      return cands[0];
+    };
+
     if (StockfishFactory) {
       const engine = StockfishFactory();
       return await new Promise((resolve) => {
         let settled = false;
-        const cleanup = () => {
-          try { if (engine.postMessage) engine.postMessage('quit'); } catch (_) {}
-        };
+        const pvMap = {};
+        const cleanup = () => { try { if (engine.postMessage) engine.postMessage('quit'); } catch(_){} };
         const onMessage = (ev) => {
           const msg = typeof ev === 'string' ? ev : (ev && ev.data ? ev.data : '');
           if (!msg) return;
-          if (msg.indexOf('bestmove') === 0) {
-            const parts = msg.split(' ');
-            const mv = parts[1] || null;
-            if (!settled) { settled = true; cleanup(); resolve(mv); }
-          }
+          try {
+            if (msg.indexOf('info') === 0 && msg.indexOf('pv ') !== -1) {
+              const m = msg.match(/multipv\s+(\d+)/);
+              const mv = msg.match(/pv\s+(.+)$/);
+              if (mv) {
+                const pvStr = mv[1].trim();
+                const mp = m ? Number(m[1]) : 1;
+                pvMap[mp] = pvStr;
+              }
+            }
+            if (msg.indexOf('bestmove') === 0) {
+              const parts = msg.split(' ');
+              const mv = parts[1] || null;
+              if (!settled) {
+                settled = true;
+                cleanup();
+                const keys = Object.keys(pvMap).map(Number).sort((a,b)=>a-b);
+                const cands = keys.map(k => (pvMap[k] ? pvMap[k].split(' ')[0] : null)).filter(Boolean);
+                const chosen = sampleMove(cands) || mv;
+                resolve(chosen);
+              }
+            }
+          } catch (e) {}
         };
         try {
           if (typeof engine.onmessage !== 'undefined') engine.onmessage = onMessage;
           if (typeof engine.addEventListener === 'function') engine.addEventListener('message', onMessage);
         } catch (_) {}
-        const safeDepth = Math.max(1, Math.min(Number(depth) || 8, 12));
+
         try {
-          engine.postMessage('uci'); engine.postMessage('isready');
-          engine.postMessage('position fen ' + fen); engine.postMessage('go depth ' + safeDepth);
-        } catch (e) {
-          try { engine('uci'); engine('isready'); engine('position fen ' + fen); engine('go depth ' + safeDepth); } catch (e2) {}
-        }
-        const to = setTimeout(() => { if (!settled) { settled = true; try { cleanup(); } catch(_){}; resolve(null); } }, 4000);
+          if (engine.postMessage) {
+            engine.postMessage('uci');
+            engine.postMessage('setoption name UCI_LimitStrength value true');
+            if (Number(elo)) engine.postMessage('setoption name UCI_Elo value ' + Number(elo));
+            engine.postMessage('setoption name MultiPV value ' + multipv);
+            engine.postMessage('isready');
+            engine.postMessage('position fen ' + fen);
+            const jitter = Math.round(Math.random() * Math.min(300, Math.round(movetime / 4)));
+            engine.postMessage('go movetime ' + Math.max(100, movetime + (Math.random() < 0.5 ? -jitter : jitter)));
+          } else if (typeof engine === 'function') {
+            engine('uci'); engine('setoption name UCI_LimitStrength value true');
+            if (Number(elo)) engine('setoption name UCI_Elo value ' + Number(elo));
+            engine('setoption name MultiPV value ' + multipv);
+            engine('isready');
+            engine('position fen ' + fen);
+            const jitter = Math.round(Math.random() * Math.min(300, Math.round(movetime / 4)));
+            engine('go movetime ' + Math.max(100, movetime + (Math.random() < 0.5 ? -jitter : jitter)));
+          }
+        } catch (e) {}
+
+        const to = setTimeout(() => { if (!settled) { settled = true; try{cleanup();}catch(_){ } ; resolve(null); } }, Math.min(10000, movetime + 4000));
         const origResolve = resolve; resolve = (v) => { clearTimeout(to); origResolve(v); };
       });
     }
 
-    // Fallback to spawning system stockfish binary
+    // spawn system binary
     return await new Promise((resolve) => {
       let settled = false;
       let stdoutBuf = '';
-      let stderrBuf = '';
+      const pvMap = {};
       let child;
-      try {
-        child = spawn('stockfish');
-      } catch (e) {
-        return resolve(null);
-      }
-
-      const cleanup = () => {
-        try { if (child && !child.killed) child.kill(); } catch (_) {}
-        try { if (child && child.stdout) child.stdout.removeAllListeners(); } catch(_){}
-        try { if (child && child.stderr) child.stderr.removeAllListeners(); } catch(_){}
-      };
-
+      try { child = spawn('stockfish'); } catch (e) { return resolve(null); }
+      const cleanup = () => { try { if (child && !child.killed) child.kill(); } catch(_){}; try { if (child && child.stdout) child.stdout.removeAllListeners(); } catch(_){}; try { if (child && child.stderr) child.stderr.removeAllListeners(); } catch(_){} };
       const onStdout = (chunk) => {
         try {
           stdoutBuf += chunk.toString();
@@ -184,35 +228,51 @@ async function bestMoveWithStockfish(fen, depth) {
           stdoutBuf = lines.pop();
           for (const line of lines) {
             if (!line) continue;
+            if (line.indexOf('info') === 0 && line.indexOf('pv ') !== -1) {
+              const m = line.match(/multipv\s+(\d+)/);
+              const mv = line.match(/pv\s+(.+)$/);
+              if (mv) {
+                const pvStr = mv[1].trim();
+                const mp = m ? Number(m[1]) : 1;
+                pvMap[mp] = pvStr;
+              }
+            }
             if (line.indexOf('bestmove') === 0) {
               const parts = line.split(' ');
               const mv = parts[1] || null;
-              if (!settled) { settled = true; cleanup(); resolve(mv); }
+              if (!settled) {
+                settled = true;
+                cleanup();
+                const keys = Object.keys(pvMap).map(Number).sort((a,b)=>a-b);
+                const cands = keys.map(k => (pvMap[k] ? pvMap[k].split(' ')[0] : null)).filter(Boolean);
+                const chosen = sampleMove(cands) || mv;
+                resolve(chosen);
+              }
             }
           }
         } catch (e) {}
       };
-      const onStderr = (chunk) => { try { stderrBuf += chunk.toString(); } catch(e){} };
-      const onError = () => { if (!settled) { settled = true; cleanup(); resolve(null); } };
-
       child.stdout.on('data', onStdout);
-      child.stderr.on('data', onStderr);
-      child.on('error', onError);
-      child.on('exit', (code) => { if (!settled) { settled = true; cleanup(); resolve(null); } });
+      child.stderr.on('data', (c) => {});
+      child.on('error', () => { if (!settled) { settled = true; cleanup(); resolve(null); } });
+      child.on('exit', () => { if (!settled) { settled = true; cleanup(); resolve(null); } });
 
-      const safeDepth = Math.max(1, Math.min(Number(depth) || 8, 20));
       try {
         child.stdin.write('uci\n');
+        child.stdin.write('setoption name UCI_LimitStrength value true\n');
+        if (Number(elo)) child.stdin.write('setoption name UCI_Elo value ' + Number(elo) + '\n');
+        child.stdin.write('setoption name MultiPV value ' + multipv + '\n');
         child.stdin.write('isready\n');
         child.stdin.write('position fen ' + fen + '\n');
-        child.stdin.write('go depth ' + safeDepth + '\n');
+        const jitter = Math.round(Math.random() * Math.min(300, Math.round(movetime / 4)));
+        const actual = Math.max(100, movetime + (Math.random() < 0.5 ? -jitter : jitter));
+        child.stdin.write('go movetime ' + actual + '\n');
       } catch (e) {}
 
-      const to = setTimeout(() => { if (!settled) { settled = true; cleanup(); resolve(null); } }, 6000);
-      // Ensure timeout is cleared if resolved
-      const origResolve = resolve;
-      resolve = (v) => { clearTimeout(to); origResolve(v); };
+      const to = setTimeout(() => { if (!settled) { settled = true; cleanup(); resolve(null); } }, Math.min(10000, movetime + 4000));
+      const origResolve = resolve; resolve = (v) => { clearTimeout(to); origResolve(v); };
     });
+
   } catch (e) {
     console.error('[stockfish] engine integration error', e && e.stack ? e.stack : e);
     return null;
@@ -295,7 +355,7 @@ app.post('/api/stockfish/move', async (req, res) => {
   } catch (_) {}
 
   try {
-    let best = await bestMoveWithStockfish(fen, depth);
+    let best = await bestMoveWithStockfish(fen, depth, elo);
     if (!best) {
       best = bestMoveFallback(fen, depth);
     }
