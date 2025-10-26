@@ -953,6 +953,8 @@ function renderBoard() {
             $('#chess-board .chess-square[data-square="' + kingSq + '"]').addClass('in-check');
         }
     }
+    // Re-apply premove highlights after board render
+    renderPremoveHighlights();
 }
 
 function squarePieceCode(sq) {
