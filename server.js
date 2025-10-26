@@ -72,13 +72,8 @@ app.get('/popsound.mp3', (req, res) => {
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Optional: try to load Stockfish WASM module for server-side analysis
+// Stockfish WASM module is unreliable on server-side, using fallback algorithm instead
 let StockfishFactory = null;
-try {
-  StockfishFactory = require('stockfish');
-} catch (_) {
-  StockfishFactory = null;
-}
 
 function eloToDepth(elo) {
   const baseElo = 600;
