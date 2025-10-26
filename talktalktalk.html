@@ -1560,6 +1560,19 @@ function ready() {
         $('#rejoin-wrapper').remove();
     }
 
+    function showStockfishRejoinPrompt() {
+        if (!$('#invites #rejoin-stockfish-game').length) {
+            var wrap = $('<div class="user-row" id="rejoin-stockfish-wrapper" />');
+            var btn = $('<button class="invite-user-btn" id="rejoin-stockfish-game">Stockfish game</button>');
+            wrap.append(btn);
+            $('#invites').append(wrap);
+        }
+    }
+
+    function hideStockfishRejoinPrompt() {
+        $('#rejoin-stockfish-wrapper').remove();
+    }
+
     function startChessGame(data) {
         __chessUnread = 0; __updateTitleBadge();
         var me = $('#username').text();
