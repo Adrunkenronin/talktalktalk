@@ -954,7 +954,8 @@ function renderBoard() {
             var pieceEl = $('<div/>').addClass('chess-piece').addClass('piece-' + pieceCode).attr('draggable', true).attr('data-square', sq).attr('data-piece', pieceCode);
             el.append(pieceEl);
         }
-        if (chessGame.lastMove && (sq === chessGame.lastMove.from || sq === chessGame.lastMove.to)) el.addClass('lastmove');
+        var histEntry = (chessGame.moveHistory && typeof chessGame.historyIndex !== 'undefined') ? chessGame.moveHistory[chessGame.historyIndex] : null;
+        if ((histEntry && (sq === histEntry.from || sq === histEntry.to)) || (chessGame.lastMove && (sq === chessGame.lastMove.from || sq === chessGame.lastMove.to))) el.addClass('lastmove');
         board.append(el);
     }
 
