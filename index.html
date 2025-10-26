@@ -818,6 +818,7 @@ function startStockfishGame(playerColor, elo) {
     $('#chess-status').text('Your color: ' + playerColor);
     pendingUserMove = null; premoveQueue = []; updateConfirmButton();
     renderBoard();
+    updateHistoryControls && updateHistoryControls();
     $('#chess-modal').removeClass('hidden');
     if (playerColor === 'black') {
         setTimeout(function() { makeStockfishMove(); }, 500);
