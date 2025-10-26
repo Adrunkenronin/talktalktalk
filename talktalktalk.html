@@ -1519,6 +1519,53 @@ function ready() {
     $('#promotion-options').on('click', '.promotion-choice', onPromotionChoice);
     $('#promotion-cancel').on('click', function(){ hidePromotionDialog(); });
 
+    // Rejoin Stockfish game button handler
+    $('#invites').on('click', '#rejoin-stockfish-game', function(){
+        if (typeof Chess === 'undefined') {
+            alert('Chess library not loaded. Please refresh the page.');
+            return;
+        }
+        try {
+            var saved = JSON.parse(localStorage.getItem('active_stockfish_game'));
+            if (saved) {
+                var board = new Chess();
+                board.load(saved.fen);
+                stockfishGame = {
+                    board: board,
+                    fen: saved.fen,
+                    turn: saved.turn,
+                    color: saved.color,
+                    engineColor: saved.engineColor,
+                    elo: saved.elo,
+                    depth: saved.depth,
+                    over: false
+                };
+                chessGame = {
+                    id: saved.id,
+                    white: saved.white,
+                    black: saved.black,
+                    color: saved.color === 'w' ? 'white' : 'black',
+                    fen: saved.fen,
+                    turn: saved.turn === 'w' ? 'white' : 'black',
+                    lastMove: null,
+                    over: false
+                };
+                hideStockfishRejoinPrompt();
+                $('#chess-white').text(chessGame.white);
+                $('#chess-black').text(chessGame.black);
+                $('#chess-status').text('Your color: ' + chessGame.color);
+                renderBoard();
+                $('#chess-modal').removeClass('hidden');
+                __chessUnread = 0; __updateTitleBadge();
+                if (board.turn() === stockfishGame.engineColor) {
+                    setTimeout(function() { makeStockfishMove(); }, 500);
+                }
+            }
+        } catch(e) {
+            console.error('Failed to restore Stockfish game:', e);
+        }
+    });
+
     // Rejoin button handler (delegated)
     $('#invites').on('click', '#rejoin-game', function(){
         if (chessGame && !chessGame.over) {
