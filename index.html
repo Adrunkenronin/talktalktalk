@@ -1516,6 +1516,10 @@ function ready() {
         }
         else if (clicktoreload) {
             var handler = function(e) {
+                // Don't reload if a Stockfish game is in progress
+                if (stockfishGame && !stockfishGame.over) {
+                    return;
+                }
                 $(document).off('click.popup keydown.popup', handler);
                 try { if (ws && typeof ws.close === 'function') ws.close(); } catch(err){}
                 try { ready(); } catch(err){}
