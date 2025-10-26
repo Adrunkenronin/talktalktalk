@@ -1205,6 +1205,19 @@ function updateChessStatus() {
     $('#chess-status').text('Turn: ' + turnName + suffix);
 }
 
+// Render premove highlights: mark target squares for queued premoves
+function renderPremoveHighlights(){
+    $('#chess-board .chess-square').removeClass('premove');
+    if (!premoveQueue || !premoveQueue.length) return;
+    // highlight all queued premove squares (from and to)
+    premoveQueue.forEach(function(m){
+        try {
+            $('#chess-board .chess-square[data-square="' + m.to + '"]').addClass('premove');
+            $('#chess-board .chess-square[data-square="' + m.from + '"]').addClass('premove');
+        } catch(e){}
+    });
+}
+
 function flashStatus(text) {
     if (!text) return;
     $('#chess-status').text(text);
