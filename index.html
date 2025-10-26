@@ -572,10 +572,6 @@ html {
 <div id="right">
     <h3>ZyberTalk</h3>
     
-    <div id="notifications">
-        <h3>Notifications</h3>
-        <span id="notificationswitch" class="dashed">on</span>
-    </div>
     
     <div>
         <h3>Username</h3>
@@ -708,7 +704,7 @@ var __audioUnmuted = false; // Track if audio has been unmuted after user intera
 
 // Safe audio playback function that handles autoplay policy restrictions
 function playNotificationSound() {
-    if (!popsound || $('#notificationswitch').text() !== 'on') return;
+    if (!popsound) return;
     try {
         popsound.currentTime = 0;
         var playPromise = popsound.play();
@@ -1501,8 +1497,7 @@ function ready() {
     }
     $(document).on('click.audio keydown.audio', unmuteAudioOnInteraction);
 
-    if (mediaPlaybackRequiresUserGesture()) { // mobile devices require user gesture to trigger a play. "Notifications" off for them.
-        $('#notificationswitch').text('off');
+    if (mediaPlaybackRequiresUserGesture()) { // mobile devices require user gesture to trigger a play
     }
 
     function popup_message (message, clicktoclosepopup, clicktoreload) {
@@ -1764,9 +1759,6 @@ function ready() {
         }
     });
 
-    $('#notificationswitch').click(function() {
-        $('#notificationswitch').text($('#notificationswitch').text() === 'on' ? 'off' : 'on');
-    });
 
     // Delete account confirmation flow
     function showDeleteConfirm(){
