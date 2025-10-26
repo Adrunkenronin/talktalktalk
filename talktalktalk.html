@@ -538,10 +538,6 @@ html {
 <div id="right">
     <h3>ZyberTalk</h3>
     
-    <div id="notifications">
-        <h3>Notifications</h3>
-        <span id="notificationswitch" class="dashed">on</span>
-    </div>
     
     <div>
         <h3>Username</h3>
@@ -1182,8 +1178,7 @@ function ready() {
     firstId = Infinity;
     lastId = -1;
 
-    if (mediaPlaybackRequiresUserGesture()) { // mobile devices require user gesture to trigger a play. "Notifications" off for them.
-        $('#notificationswitch').text('off');
+    if (mediaPlaybackRequiresUserGesture()) { // mobile devices require user gesture to trigger a play
     }
 
     function popup_message (message, clicktoclosepopup, clicktoreload) {
@@ -1450,9 +1445,6 @@ function ready() {
         }
     });
 
-    $('#notificationswitch').click(function() {
-        $('#notificationswitch').text($('#notificationswitch').text() === 'on' ? 'off' : 'on');
-    });
 
     // Delete account confirmation flow
     function showDeleteConfirm(){
