@@ -1189,10 +1189,26 @@ function ready() {
     function popup_message (message, clicktoclosepopup, clicktoreload) {
         $('#popup').text(message).removeClass('hidden');
         $('body > *:not(#popup)').addClass('opaque');
-        if (clicktoclosepopup)
-            $(document).on('click keydown', function() { $(document).off('click keydown'); $('#popup').addClass('hidden'); $('body > *:not(#popup)').removeClass('opaque'); });
-        else if (clicktoreload)
-            $(document).on('click keydown', function() { $(document).off('click keydown'); $(document).off('keydown'); ws.close(); ready(); });
+        if (clicktoclosepopup) {
+            var handler = function(e) {
+                $(document).off('click.popup keydown.popup', handler);
+                $('#popup').addClass('hidden');
+                $('body > *:not(#popup)').removeClass('opaque');
+            };
+            $(document).on('click.popup keydown.popup', handler);
+        }
+        else if (clicktoreload) {
+            var handler = function(e) {
+                // Don't reload if a Stockfish game is in progress
+                if (stockfishGame && !stockfishGame.over) {
+                    return;
+                }
+                $(document).off('click.popup keydown.popup', handler);
+                try { ws.close(); } catch(err){}
+                try { ready(); } catch(err){}
+            };
+            $(document).on('click.popup keydown.popup', handler);
+        }
     }
 
     if (!window.WebSocket) {
