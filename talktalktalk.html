@@ -847,11 +847,15 @@ function makeStockfishMove(bestmove, retries) {
         var position = board.fen();
         var depth = stockfishGame.depth;
         $('#chess-status').text('Engine thinking...');
+        var controller = new AbortController();
+        var timeoutId = setTimeout(function(){ controller.abort(); }, 8000);
         fetch('/api/stockfish/move', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fen: position, depth: depth, elo: stockfishGame.elo })
+            body: JSON.stringify({ fen: position, depth: depth, elo: stockfishGame.elo }),
+            signal: controller.signal
         }).then(function(r){
+            clearTimeout(timeoutId);
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.json();
         }).then(function(resp){
@@ -863,6 +867,7 @@ function makeStockfishMove(bestmove, retries) {
                 $('#chess-status').text('Engine error, please try again');
             }
         }).catch(function(err){
+            clearTimeout(timeoutId);
             if (retries < 2) {
                 setTimeout(function() { makeStockfishMove(null, retries + 1); }, 500);
             } else {
