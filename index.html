@@ -910,7 +910,7 @@ function makeStockfishMove(bestmove) {
             var payload = { fen: position, depth: depth, elo: stockfishGame.elo };
             try { console.info('[stockfish] fetching', { url: url, payload: payload }); } catch(e){}
             var controller = new AbortController();
-            var timeoutId = setTimeout(function(){ controller.abort(); }, 8000);
+            var timeoutId = setTimeout(function(){ controller.abort(); }, 12000);
             fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -935,11 +935,12 @@ function makeStockfishMove(bestmove) {
             }).catch(function(err){
                 stockfishGame.fetchInFlight = false;
                 clearTimeout(timeoutId);
-                console.error('Stockfish fetch error:', err);
+                console.error('Stockfish fetch error:', err.name || err.message || err);
                 if (retries > 0) {
                     // exponential backoff retry
-                    var wait = 300 * Math.pow(2, 3 - retries);
+                    var wait = 500 * Math.pow(2, 3 - retries);
                     console.warn('Retrying stockfish fetch in', wait, 'ms (retries left:', retries - 1 + ')');
+                    $('#chess-status').text('Engine busy, retrying...');
                     setTimeout(function(){ attemptFetch(retries - 1); }, wait);
                 } else {
                     $('#chess-status').text('Engine error (network)');
