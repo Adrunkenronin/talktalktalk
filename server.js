@@ -141,9 +141,12 @@ function bestMoveFallback(fen, depth) {
   const maxDepth = Math.max(1, Number(depth) || 5);
   const player = chess.turn();
   const startTime = Date.now();
-  const maxTime = Math.min(5000, 500 + depth * 100); // Adaptive timeout: 500ms base + 100ms per depth level, max 5s
+  // Time limit: 200ms base + 150ms per depth, capped at 3s
+  // This ensures responses stay under 4s (with network overhead)
+  const maxTime = Math.min(3000, 200 + depth * 150);
   let nodeCount = 0;
-  const maxNodes = 50000; // Stop after evaluating this many positions
+  // Reduce max nodes for deeper searches to maintain responsiveness
+  const maxNodes = depth > 14 ? 30000 : 50000;
 
   function negamax(d, alpha, beta) {
     nodeCount++;
