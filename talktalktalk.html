@@ -1507,10 +1507,12 @@ function ready() {
     // Chess modal controls
     $('#chess-close').on('click', function(){
         $('#chess-modal').addClass('hidden');
+        console.log('Close button clicked. stockfishGame:', !!stockfishGame, 'over:', stockfishGame ? stockfishGame.over : 'N/A');
         if (stockfishGame && !stockfishGame.over) {
+            console.log('Saving Stockfish game and showing rejoin button');
             showStockfishRejoinPrompt();
             try {
-                localStorage.setItem('active_stockfish_game', JSON.stringify({
+                var saveData = {
                     id: chessGame.id,
                     white: chessGame.white,
                     black: chessGame.black,
@@ -1520,8 +1522,10 @@ function ready() {
                     engineColor: stockfishGame.engineColor,
                     elo: stockfishGame.elo,
                     depth: stockfishGame.depth
-                }));
-            } catch(e){}
+                };
+                console.log('Saving to localStorage:', saveData);
+                localStorage.setItem('active_stockfish_game', JSON.stringify(saveData));
+            } catch(e){ console.error('Failed to save Stockfish game:', e); }
         } else if (chessGame && !chessGame.over) {
             showRejoinPrompt();
             try { localStorage.setItem('active_game', JSON.stringify({ id: chessGame.id, white: chessGame.white, black: chessGame.black })); } catch(e){}
