@@ -1048,6 +1048,7 @@ function stageMove(from, to, promotion){
 function enqueuePremove(from, to, promotion){
     premoveQueue.push({ from: from, to: to, promotion: promotion || null });
     flashStatus('Premove queued');
+    renderPremoveHighlights();
 }
 
 function isMyTurn(){
