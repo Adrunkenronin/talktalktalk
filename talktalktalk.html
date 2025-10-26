@@ -1212,6 +1212,12 @@ function ready() {
                         ws.send(JSON.stringify({ type: 'chess_resume_request', game_id: obj.id }));
                     }
                 } catch(e){}
+                try {
+                    var asg = localStorage.getItem('active_stockfish_game');
+                    if (asg) {
+                        showStockfishRejoinPrompt();
+                    }
+                } catch(e){}
             }, 150);
             lastPong = Date.now();
             $('#popup').addClass('hidden'); $(':not(#popup)').removeClass('opaque');
