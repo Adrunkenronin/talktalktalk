@@ -80,45 +80,57 @@ app.get('/popsound.mp3', (req, res) => {
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Stockfish WASM module is unreliable on server-side, using fallback algorithm instead
-let StockfishFactory = null;
+// Use Lichess Cloud Eval API for real Stockfish moves
+const LICHESS_EVAL_URL = 'https://lichess.org/api/cloud-eval';
 
 function eloToDepth(elo) {
+  // Map ELO to multipv for Lichess API
+  // multipv: how many top moves to consider (1-5)
   const rating = Number(elo) || 600;
 
-  const eloDepthMap = [
-    { elo: 600, depth: 6 },
-    { elo: 750, depth: 7 },
-    { elo: 900, depth: 8 },
-    { elo: 1050, depth: 9 },
-    { elo: 1200, depth: 10 },
-    { elo: 1350, depth: 11 },
-    { elo: 1500, depth: 12 },
-    { elo: 1650, depth: 13 },
-    { elo: 1800, depth: 14 },
-    { elo: 1950, depth: 15 },
-    { elo: 2100, depth: 16 },
-    { elo: 2250, depth: 17 },
-    { elo: 2400, depth: 18 }
-  ];
-
-  if (rating <= eloDepthMap[0].elo) return eloDepthMap[0].depth;
-  if (rating >= eloDepthMap[eloDepthMap.length - 1].elo) return eloDepthMap[eloDepthMap.length - 1].depth;
-
-  for (let i = 0; i < eloDepthMap.length - 1; i++) {
-    if (rating >= eloDepthMap[i].elo && rating <= eloDepthMap[i + 1].elo) {
-      const lower = eloDepthMap[i];
-      const upper = eloDepthMap[i + 1];
-      const ratio = (rating - lower.elo) / (upper.elo - lower.elo);
-      return Math.round(lower.depth + (upper.depth - lower.depth) * ratio);
-    }
-  }
-
-  return 8;
+  // Higher ELO = more analysis depth (multipv considers more variations)
+  if (rating <= 750) return { multiPv: 1, maxDepth: 20 };
+  if (rating <= 1050) return { multiPv: 1, maxDepth: 25 };
+  if (rating <= 1350) return { multiPv: 1, maxDepth: 30 };
+  if (rating <= 1650) return { multiPv: 2, maxDepth: 35 };
+  if (rating <= 1950) return { multiPv: 2, maxDepth: 40 };
+  return { multiPv: 3, maxDepth: 45 };
 }
 
-async function bestMoveWithStockfish(fen, depth) {
-  return null;
+async function getBestMoveFromLichess(fen, elo) {
+  try {
+    const params = new URLSearchParams({
+      fen: fen,
+      variant: 'standard'
+    });
+
+    const response = await fetch(`${LICHESS_EVAL_URL}?${params}`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      timeout: 5000
+    });
+
+    if (!response.ok) {
+      console.warn(`[lichess] HTTP ${response.status}, falling back to local algorithm`);
+      return null;
+    }
+
+    const data = await response.json();
+
+    // Extract best move from Lichess response
+    if (data.pvs && data.pvs.length > 0 && data.pvs[0].moves) {
+      const moves = data.pvs[0].moves.split(' ');
+      if (moves.length > 0) {
+        console.log('[lichess] best move:', moves[0], 'depth:', data.depth);
+        return moves[0];
+      }
+    }
+
+    return null;
+  } catch (err) {
+    console.warn('[lichess] error:', err.message, '- falling back to local algorithm');
+    return null;
+  }
 }
 
 function evaluateBoardMaterial(chess) {
