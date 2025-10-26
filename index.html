@@ -1735,6 +1735,8 @@ function ready() {
             updateChessStatus();
         }
     }
+    // expose to global so other non-closure code can call it
+    try { window.updateHistoryControls = updateHistoryControls; } catch(e){}
 
     // Rejoin button handler (delegated)
     $('#invites').on('click', '#rejoin-game', function(){
