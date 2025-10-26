@@ -806,7 +806,17 @@ function timeConverter(t) {     // http://stackoverflow.com/a/40449006/1422096
 
 function mediaPlaybackRequiresUserGesture() { // http://stackoverflow.com/a/40474415/1422096
   var audio = document.createElement('audio');
-  audio.play();
+  audio.muted = true;
+  try {
+    var playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(function(error) {
+        console.warn('Audio playback check failed:', error);
+      });
+    }
+  } catch (e) {
+    console.warn('Error checking audio playback:', e);
+  }
   return audio.paused;
 }
 
