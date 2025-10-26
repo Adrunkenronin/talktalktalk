@@ -1907,6 +1907,7 @@ function ready() {
                 chessGame.historyIndex = chessGame.moveHistory.length - 1;
                 renderBoard();
                 updateChessStatus();
+                updateHistoryControls && updateHistoryControls();
                 clearPendingMove();
                 tryPlayPremoves();
                 if (document.hidden && chessGame.turn === chessGame.color) { __chessUnread += 1; __updateTitleBadge(); }
