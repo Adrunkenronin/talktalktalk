@@ -709,6 +709,9 @@ var __audioUnmuted = false; // Track if audio has been unmuted after user intera
 // Safe audio playback function that handles autoplay policy restrictions
 function playNotificationSound() {
     if (!popsound || $('#notificationswitch').text() !== 'on') return;
+    if (!__audioUnmuted) {
+        return;
+    }
     try {
         popsound.currentTime = 0;
         var playPromise = popsound.play();
