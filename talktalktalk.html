@@ -1499,6 +1499,8 @@ function ready() {
     $('#chess-resign').on('click', function(){
         if (stockfishGame) {
             stockfishGame.over = true;
+            hideStockfishRejoinPrompt();
+            try { localStorage.removeItem('active_stockfish_game'); } catch(e){}
             $('#chess-modal').addClass('hidden');
             stockfishGame = null;
             chessGame = null;
