@@ -60,6 +60,14 @@ loadKnownUsers();
 const app = express();
 app.use(express.static(path.join(__dirname)));
 app.use(express.json());
+// Allow CORS for API endpoints so clients opened from file:// or other origins can call /api
+app.use(function(req, res, next) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'talktalktalk.html'));
