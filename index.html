@@ -1317,17 +1317,66 @@ function updateChessStatus() {
     $('#chess-status').text('Turn: ' + turnName + suffix);
 }
 
-// Render premove highlights: mark target squares for queued premoves
-function renderPremoveHighlights(){
+// Clear any premove preview visuals
+function clearPremovePreviews(){
     $('#chess-board .chess-square').removeClass('premove');
+    $('#chess-board .chess-piece.premove-ghost').remove();
+}
+
+// Render premove highlights and ghost pieces indicating where queued premoves will land
+function renderPremoveHighlights(){
+    clearPremovePreviews();
     if (!premoveQueue || !premoveQueue.length) return;
-    // highlight all queued premove squares (from and to)
-    premoveQueue.forEach(function(m){
-        try {
-            $('#chess-board .chess-square[data-square="' + m.to + '"]').addClass('premove');
-            $('#chess-board .chess-square[data-square="' + m.from + '"]').addClass('premove');
-        } catch(e){}
-    });
+
+    // Attempt to simulate the queued premoves on a cloned chess board so later premoves show correct targets
+    try {
+        if (typeof Chess === 'undefined') {
+            // fall back to simple highlight of destinations
+            premoveQueue.forEach(function(m){
+                try { $('#chess-board .chess-square[data-square="' + m.to + '"]').addClass('premove'); } catch(e){}
+            });
+            return;
+        }
+        var sim = new Chess();
+        try { sim.load(chessGame.fen); } catch(e) { sim = new Chess(); }
+        // For each premove, try to apply it on the simulated board and place a ghost piece on the destination
+        premoveQueue.forEach(function(m, idx){
+            try {
+                var mv = sim.move({ from: m.from, to: m.to, promotion: m.promotion });
+                if (mv) {
+                    // highlight the destination square
+                    var $to = $('#chess-board .chess-square[data-square="' + mv.to + '"]');
+                    $to.addClass('premove');
+                    // create a ghost piece representing the piece that will end up on the destination
+                    var colorPrefix = mv.color === 'w' ? 'w' : 'b';
+                    var pieceCode = colorPrefix + mv.piece; // e.g., 'wp','wn'
+                    var $ghost = $('<div/>').addClass('chess-piece premove-ghost').addClass('piece-' + pieceCode);
+                    // Add data attributes for debugging or interaction
+                    $ghost.attr('data-premove-index', idx);
+                    $ghost.attr('data-piece', pieceCode);
+                    $to.append($ghost);
+                } else {
+                    // illegal on simulated board: still mark intended destination with subtle highlight
+                    $('#chess-board .chess-square[data-square="' + m.to + '"]').addClass('premove');
+                }
+            } catch(e) {
+                try { $('#chess-board .chess-square[data-square="' + m.to + '"]').addClass('premove'); } catch(_e){}
+            }
+        });
+    } catch(e) {
+        // last-resort: highlight destinations only
+        premoveQueue.forEach(function(m){ try { $('#chess-board .chess-square[data-square="' + m.to + '"]').addClass('premove'); } catch(e){} });
+    }
+}
+
+// Cancel all queued premoves and clear visuals
+function clearAllPremoves(){
+    premoveQueue = [];
+    clearPremovePreviews();
+    clearTentativeMoveVisuals();
+    flashStatus('All premoves cancelled');
+    // re-render board to ensure consistency
+    renderBoard();
 }
 
 // Show a tentative visual of a move (does not change game state)
