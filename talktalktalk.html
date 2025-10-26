@@ -798,8 +798,9 @@ function startStockfishGame(playerColor, elo) {
     }
 }
 
-function makeStockfishMove(bestmove) {
+function makeStockfishMove(bestmove, retries) {
     if (!stockfishGame || stockfishGame.over) return;
+    retries = retries || 0;
     var board = stockfishGame.board;
     var moves;
     if (bestmove) {
@@ -820,14 +821,28 @@ function makeStockfishMove(bestmove) {
         }
         var position = board.fen();
         var depth = stockfishGame.depth;
+        $('#chess-status').text('Engine thinking...');
         fetch('/api/stockfish/move', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ fen: position, depth: depth, elo: stockfishGame.elo })
-        }).then(function(r){ return r.json(); }).then(function(resp){
+        }).then(function(r){
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        }).then(function(resp){
             if (resp && resp.bestmove) { makeStockfishMove(resp.bestmove); }
-        }).catch(function(){
-            $('#chess-status').text('Engine error');
+            else if (resp && resp.error && retries < 2) {
+                setTimeout(function() { makeStockfishMove(null, retries + 1); }, 500);
+            }
+            else {
+                $('#chess-status').text('Engine error, please try again');
+            }
+        }).catch(function(err){
+            if (retries < 2) {
+                setTimeout(function() { makeStockfishMove(null, retries + 1); }, 500);
+            } else {
+                $('#chess-status').text('Engine error, please reload');
+            }
         });
         return;
     }
