@@ -719,6 +719,8 @@ var pendingPromotion = null;
 var pendingUserMove = null; // {from,to,promotion}
 var premoveQueue = [];
 var currentTentative = null; // {from,to,isPremove}
+// Guards to prevent re-entrant premove processing and concurrent engine fetches
+var __processingPremoves = false;
 
 // Stockfish state
 var stockfishGame = null; // {fen, turn, color, engineColor, elo, over}
