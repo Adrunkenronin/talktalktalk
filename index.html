@@ -487,6 +487,12 @@ html {
 /* Premove highlight (slightly red, like chess.com) */
 .chess-square.premove { box-shadow: inset 0 0 0 3px rgba(220, 53, 69, 0.35); }
 .chess-square.premove::after { content: ''; position: absolute; inset: 0; background: rgba(220, 53, 69, 0.08); pointer-events: none; }
+/* History control styles */
+.history-controls .chess-button { width: 2.25rem; height: 2.25rem; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; }
+.history-controls .chess-button:disabled { opacity: 0.45; cursor: not-allowed; }
+/* Tentative move visuals */
+.chess-square.tentative-source .chess-piece { opacity: 0.08 !important; }
+.chess-piece.tentative-piece { position: absolute; inset: 0; background-position: center; background-repeat: no-repeat; background-size: 80% auto; pointer-events: none; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25)); opacity: 0.95; transform: translateZ(0); }
 /* Tentative move visuals */
 .chess-square.tentative-source .chess-piece { opacity: 0.08 !important; }
 .chess-piece.tentative-piece { position: absolute; inset: 0; background-position: center; background-repeat: no-repeat; background-size: 80% auto; pointer-events: none; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25)); opacity: 0.95; transform: translateZ(0); }
@@ -652,6 +658,11 @@ html {
     <div class="chess-board" id="chess-board"></div>
     <div class="chess-panel">
       <h4>Chess</h4>
+      <div class="history-controls" style="display:flex;gap:0.5rem;align-items:center;">
+        <button class="chess-button" id="chess-prev" title="Previous move"><i class="fas fa-chevron-left"></i></button>
+        <button class="chess-button" id="chess-next" title="Next move"><i class="fas fa-chevron-right"></i></button>
+        <div style="flex:1"></div>
+      </div>
       <div class="chess-status" id="chess-status"></div>
       <div>White: <span id="chess-white"></span></div>
       <div>Black: <span id="chess-black"></span></div>
@@ -851,6 +862,10 @@ function makeStockfishMove(bestmove) {
     chessGame.fen = board.fen();
     chessGame.turn = board.turn() === 'w' ? 'white' : 'black';
     chessGame.lastMove = { from: moves.from, to: moves.to };
+    // push to history
+    chessGame.moveHistory = chessGame.moveHistory || [];
+    chessGame.moveHistory.push({ fen: board.fen(), from: moves.from, to: moves.to });
+    chessGame.historyIndex = chessGame.moveHistory.length - 1;
     renderBoard();
     if (board.in_checkmate() || board.in_stalemate()) {
         stockfishGame.over = true;
@@ -876,6 +891,10 @@ function handleStockfishMove(from, to, promotion) {
     chessGame.fen = board.fen();
     chessGame.turn = board.turn() === 'w' ? 'white' : 'black';
     chessGame.lastMove = { from: from, to: to };
+    // push to history
+    chessGame.moveHistory = chessGame.moveHistory || [];
+    chessGame.moveHistory.push({ fen: board.fen(), from: from, to: to });
+    chessGame.historyIndex = chessGame.moveHistory.length - 1;
     renderBoard();
     if (board.in_checkmate() || board.in_stalemate()) {
         stockfishGame.over = true;
@@ -1107,6 +1126,11 @@ function tryPlayPremoves(){
 
 function attemptMove(from, to) {
     if (!chessGame || pendingPromotion) return;
+    // Do not allow moves while viewing history
+    if (chessGame && chessGame.moveHistory && typeof chessGame.historyIndex !== 'undefined') {
+        var last = chessGame.moveHistory.length - 1;
+        if (chessGame.historyIndex !== last) { flashStatus('Return to latest position to move'); clearSelection(); return; }
+    }
     if (!from || !to || from === to) return;
     var pieceCode = squarePieceCode(from);
     if (!pieceCode) { clearSelection(); return; }
@@ -1168,6 +1192,11 @@ function onSquareClick() {
 
 function onPieceDragStart(e) {
     if (!chessGame || pendingPromotion) { e.preventDefault(); return; }
+    // Do not allow dragging while viewing history
+    if (chessGame && chessGame.moveHistory && typeof chessGame.historyIndex !== 'undefined') {
+        var last = chessGame.moveHistory.length - 1;
+        if (chessGame.historyIndex !== last) { flashStatus('Return to latest position to move'); e.preventDefault(); return; }
+    }
     var parentSquare = $(this).parent().data('square');
     var pieceCode = squarePieceCode(parentSquare);
     if (!pieceCode) { e.preventDefault(); return; }
@@ -1617,6 +1646,19 @@ function ready() {
         var m = pendingUserMove; clearPendingMove();
         sendMove(m.from, m.to, m.promotion);
     });
+
+    // Keyboard: Enter confirms staged move (unless typing in inputs)
+    $(document).on('keydown.chessconfirm', function(e){
+        if (e.key !== 'Enter' || e.shiftKey) return;
+        // ignore when focus is in chat input or any text input
+        var active = document.activeElement;
+        if ($(active).is('textarea, input') || $(active).closest('#promotion-overlay').length) return;
+        if (!$('#chess-modal').length || $('#chess-modal').hasClass('hidden')) return;
+        if (pendingUserMove && !$('#chess-confirm-move').prop('disabled')) {
+            e.preventDefault();
+            $('#chess-confirm-move').trigger('click');
+        }
+    });
     $('#chess-resign').on('click', function(){
         if (stockfishGame) {
             stockfishGame.over = true;
@@ -1643,6 +1685,46 @@ function ready() {
         .on('drop', '.chess-square', onSquareDrop);
     $('#promotion-options').on('click', '.promotion-choice', onPromotionChoice);
     $('#promotion-cancel').on('click', function(){ hidePromotionDialog(); });
+
+    // history controls
+    $('#chess-prev').on('click', function(){
+        if (!chessGame || !chessGame.moveHistory) return;
+        var idx = chessGame.historyIndex || 0;
+        if (idx <= 0) return;
+        chessGame.historyIndex = idx - 1;
+        var entry = chessGame.moveHistory[chessGame.historyIndex];
+        chessGame.fen = entry.fen;
+        renderBoard();
+        updateChessStatus();
+        updateHistoryControls();
+    });
+    $('#chess-next').on('click', function(){
+        if (!chessGame || !chessGame.moveHistory) return;
+        var idx = chessGame.historyIndex || 0;
+        var last = chessGame.moveHistory.length - 1;
+        if (idx >= last) return;
+        chessGame.historyIndex = idx + 1;
+        var entry = chessGame.moveHistory[chessGame.historyIndex];
+        chessGame.fen = entry.fen;
+        renderBoard();
+        updateChessStatus();
+        updateHistoryControls();
+    });
+
+    function updateHistoryControls(){
+        if (!chessGame || !chessGame.moveHistory) return;
+        var idx = chessGame.historyIndex || 0;
+        var last = chessGame.moveHistory.length - 1;
+        $('#chess-prev').prop('disabled', idx <= 0);
+        $('#chess-next').prop('disabled', idx >= last);
+        // when viewing not-latest, block making moves
+        if (idx < last) {
+            // show visual hint
+            $('#chess-status').text('Viewing move ' + idx + ' of ' + last + ' (use arrows to return)');
+        } else {
+            updateChessStatus();
+        }
+    }
 
     // Rejoin button handler (delegated)
     $('#invites').on('click', '#rejoin-game', function(){
@@ -1696,7 +1778,9 @@ function ready() {
             fen: data['fen'],
             turn: data['turn'],
             lastMove: null,
-            over: false
+            over: false,
+            moveHistory: [{ fen: data['fen'], from: null, to: null }],
+            historyIndex: 0
         };
         hideRejoinPrompt();
         $('#chess-white').text(chessGame.white);
@@ -1815,6 +1899,10 @@ function ready() {
                 chessGame.turn = data['turn'];
                 chessGame.inCheck = !!data['check'];
                 chessGame.lastMove = { from: data['from'], to: data['to'] };
+                // push history
+                chessGame.moveHistory = chessGame.moveHistory || [];
+                chessGame.moveHistory.push({ fen: data['fen'], from: data['from'], to: data['to'] });
+                chessGame.historyIndex = chessGame.moveHistory.length - 1;
                 renderBoard();
                 updateChessStatus();
                 clearPendingMove();
