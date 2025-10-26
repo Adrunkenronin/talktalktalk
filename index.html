@@ -1060,6 +1060,7 @@ function tryPlayPremoves(){
     if (!chessGame || !premoveQueue.length) return;
     if (!isMyTurn()) return;
     var mv = premoveQueue.shift();
+    renderPremoveHighlights();
     if (stockfishGame) {
         // validate against current board
         var b = stockfishGame.board;
