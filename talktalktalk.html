@@ -854,6 +854,8 @@ function makeStockfishMove(bestmove, retries) {
     renderBoard();
     if (board.in_checkmate() || board.in_stalemate()) {
         stockfishGame.over = true;
+        hideStockfishRejoinPrompt();
+        try { localStorage.removeItem('active_stockfish_game'); } catch(e){}
         var result = board.in_checkmate() ? 'checkmate' : 'stalemate';
         var winner = board.turn() === 'w' ? 'Black' : 'White';
         $('#chess-status').text('Game over: ' + result + ', ' + winner + ' wins!');
