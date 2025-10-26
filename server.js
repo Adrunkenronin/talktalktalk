@@ -184,13 +184,33 @@ app.post('/api/stockfish/move', async (req, res) => {
   if (!fen) return res.status(400).json({ error: 'fen required' });
   if (!depth && elo) depth = eloToDepth(elo);
   if (!depth) depth = 8;
+
   try {
-    let best = await bestMoveWithStockfish(fen, depth);
+    let best = null;
+    let responseTimeout = false;
+
+    const timeoutPromise = new Promise((resolve) => {
+      setTimeout(() => {
+        responseTimeout = true;
+        resolve(null);
+      }, 8000);
+    });
+
+    best = await Promise.race([
+      bestMoveWithStockfish(fen, depth),
+      timeoutPromise
+    ]);
+
     if (!best) best = bestMoveFallback(fen, depth);
     if (!best) return res.status(422).json({ error: 'no_move' });
-    res.json({ bestmove: best });
+
+    if (!responseTimeout && res.headersSent === false) {
+      res.json({ bestmove: best });
+    }
   } catch (e) {
-    res.status(500).json({ error: 'engine_error' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'engine_error' });
+    }
   }
 });
 
