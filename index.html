@@ -455,14 +455,6 @@ html {
     margin-bottom: 1.5rem;
 }
 
-#notificationswitch {
-    padding: 0.25rem 0.5rem;
-    background: var(--accent-secondary);
-    color: var(--accent-primary);
-    border-radius: var(--radius-sm);
-    font-size: 0.75rem;
-    font-weight: 500;
-}
 
 /* Fork banner */
 #fork {
@@ -572,10 +564,6 @@ html {
 <div id="right">
     <h3>ZyberTalk</h3>
     
-    <div id="notifications">
-        <h3>Notifications</h3>
-        <span id="notificationswitch" class="dashed">on</span>
-    </div>
     
     <div>
         <h3>Username</h3>
@@ -708,7 +696,7 @@ var __audioUnmuted = false; // Track if audio has been unmuted after user intera
 
 // Safe audio playback function that handles autoplay policy restrictions
 function playNotificationSound() {
-    if (!popsound || $('#notificationswitch').text() !== 'on') return;
+    if (!popsound) return;
     if (!__audioUnmuted) {
         return;
     }
@@ -1514,9 +1502,6 @@ function ready() {
     }
     $(document).on('click.audio keydown.audio', unmuteAudioOnInteraction);
 
-    if (mediaPlaybackRequiresUserGesture()) { // mobile devices require user gesture to trigger a play. "Notifications" off for them.
-        $('#notificationswitch').text('off');
-    }
 
     function popup_message (message, clicktoclosepopup, clicktoreload) {
         $('#popup').text(message).removeClass('hidden');
@@ -1777,9 +1762,6 @@ function ready() {
         }
     });
 
-    $('#notificationswitch').click(function() {
-        $('#notificationswitch').text($('#notificationswitch').text() === 'on' ? 'off' : 'on');
-    });
 
     // Delete account confirmation flow
     function showDeleteConfirm(){
