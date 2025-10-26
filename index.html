@@ -1345,7 +1345,7 @@ function ready() {
         if (clicktoclosepopup)
             $(document).on('click keydown', function() { $(document).off('click keydown'); $('#popup').addClass('hidden'); $('body > *:not(#popup)').removeClass('opaque'); });
         else if (clicktoreload)
-            $(document).on('click keydown', function() { $(document).off('click keydown'); $(document).off('keydown'); ws.close(); ready(); });
+            $(document).on('click keydown', function() { $(document).off('click keydown'); $(document).off('keydown'); try { if (ws && typeof ws.close === 'function') ws.close(); } catch(e){} try { ready(); } catch(e){} });
     }
 
     if (!window.WebSocket) {
