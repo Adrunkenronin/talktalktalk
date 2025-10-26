@@ -820,7 +820,7 @@ function initializeStockfish() {
 function eloToDepth(elo) {
     var baseElo = 600;
     var increment = 150;
-    var baseDepth = 5;
+    var baseDepth = 6;
     var depthIncrement = 1;
     var steps = Math.round((elo - baseElo) / increment);
     return Math.max(1, baseDepth + steps * depthIncrement);
