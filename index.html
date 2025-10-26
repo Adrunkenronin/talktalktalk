@@ -909,17 +909,22 @@ function makeStockfishMove(bestmove) {
             var url = (API_BASE || '') + '/api/stockfish/move';
             var payload = { fen: position, depth: depth, elo: stockfishGame.elo };
             try { console.info('[stockfish] fetching', { url: url, payload: payload }); } catch(e){}
+            var controller = new AbortController();
+            var timeoutId = setTimeout(function(){ controller.abort(); }, 8000);
             fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
+                signal: controller.signal
             }).then(function(r){
                 stockfishGame.fetchInFlight = false;
+                clearTimeout(timeoutId);
                 if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + r.statusText);
                 return r.json();
             }).then(function(resp){
-                if (resp && resp.bestmove) { makeStockfishMove(resp.bestmove); }
-                if (resp && resp.bestmove) { makeStockfishMove(resp.bestmove); }
+                if (resp && resp.bestmove) {
+                    makeStockfishMove(resp.bestmove);
+                }
                 else if (resp && resp.error) {
                     console.warn('Engine responded with error:', resp.error);
                     $('#chess-status').text('Engine error: ' + resp.error);
@@ -929,6 +934,7 @@ function makeStockfishMove(bestmove) {
                 }
             }).catch(function(err){
                 stockfishGame.fetchInFlight = false;
+                clearTimeout(timeoutId);
                 console.error('Stockfish fetch error:', err);
                 if (retries > 0) {
                     // exponential backoff retry
