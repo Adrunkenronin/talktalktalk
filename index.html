@@ -705,6 +705,23 @@ html {
 var popsound = new Audio('popsound.mp3');
 popsound.muted = true; // Mute initially to comply with browser autoplay policies
 var __audioUnmuted = false; // Track if audio has been unmuted after user interaction
+
+// Safe audio playback function that handles autoplay policy restrictions
+function playNotificationSound() {
+    if (!popsound || $('#notificationswitch').text() !== 'on') return;
+    try {
+        popsound.currentTime = 0;
+        var playPromise = popsound.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(function(error) {
+                console.warn('Audio playback failed:', error);
+            });
+        }
+    } catch (e) {
+        console.warn('Error playing notification sound:', e);
+    }
+}
+
 var API_BASE = (location.protocol === 'file:') ? (window.__API_BASE_OVERRIDE__ || 'http://localhost:12000') : '';
 var randomname = 'user' + Math.floor((Math.random() * 1000) + 1);
 var displayeduser;
