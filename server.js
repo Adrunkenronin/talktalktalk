@@ -85,41 +85,7 @@ function eloToDepth(elo) {
 }
 
 async function bestMoveWithStockfish(fen, depth) {
-  if (!StockfishFactory) return null;
-  return await new Promise((resolve) => {
-    try {
-      const engine = StockfishFactory();
-      let resolved = false;
-      const maxTimeout = 5000;
-      const timeout = setTimeout(() => {
-        if (!resolved) {
-          resolved = true;
-          try { engine.postMessage && engine.postMessage('quit'); } catch(_){}
-          resolve(null);
-        }
-      }, maxTimeout);
-
-      engine.onmessage = (ev) => {
-        const line = (ev && (ev.data || ev)) || '';
-        if (typeof line === 'string' && line.indexOf('bestmove') > -1) {
-          const bm = line.split(' ')[1];
-          if (!resolved) {
-            resolved = true;
-            clearTimeout(timeout);
-            try { engine.postMessage && engine.postMessage('quit'); } catch(_){}
-            resolve(bm || null);
-          }
-        }
-      };
-
-      try { engine.postMessage('uci'); } catch(_){}
-      try { engine.postMessage('isready'); } catch(_){}
-      try { engine.postMessage(`position fen ${fen}`); } catch(_){}
-      try { engine.postMessage(`go depth ${Number(depth) || 8}`); } catch(_){}
-    } catch (_) {
-      resolve(null);
-    }
-  });
+  return null;
 }
 
 function evaluateBoardMaterial(chess) {
