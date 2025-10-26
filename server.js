@@ -87,19 +87,19 @@ function eloToDepth(elo) {
   const rating = Number(elo) || 600;
 
   const eloDepthMap = [
-    { elo: 600, depth: 5 },
-    { elo: 750, depth: 6 },
-    { elo: 900, depth: 7 },
-    { elo: 1050, depth: 8 },
-    { elo: 1200, depth: 9 },
-    { elo: 1350, depth: 10 },
-    { elo: 1500, depth: 11 },
-    { elo: 1650, depth: 12 },
-    { elo: 1800, depth: 13 },
-    { elo: 1950, depth: 14 },
-    { elo: 2100, depth: 15 },
-    { elo: 2250, depth: 16 },
-    { elo: 2400, depth: 17 }
+    { elo: 600, depth: 6 },
+    { elo: 750, depth: 7 },
+    { elo: 900, depth: 8 },
+    { elo: 1050, depth: 9 },
+    { elo: 1200, depth: 10 },
+    { elo: 1350, depth: 11 },
+    { elo: 1500, depth: 12 },
+    { elo: 1650, depth: 13 },
+    { elo: 1800, depth: 14 },
+    { elo: 1950, depth: 15 },
+    { elo: 2100, depth: 16 },
+    { elo: 2250, depth: 17 },
+    { elo: 2400, depth: 18 }
   ];
 
   if (rating <= eloDepthMap[0].elo) return eloDepthMap[0].depth;
