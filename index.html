@@ -909,17 +909,22 @@ function makeStockfishMove(bestmove) {
             var url = (API_BASE || '') + '/api/stockfish/move';
             var payload = { fen: position, depth: depth, elo: stockfishGame.elo };
             try { console.info('[stockfish] fetching', { url: url, payload: payload }); } catch(e){}
+            var controller = new AbortController();
+            var timeoutId = setTimeout(function(){ controller.abort(); }, 12000);
             fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
+                signal: controller.signal
             }).then(function(r){
                 stockfishGame.fetchInFlight = false;
+                clearTimeout(timeoutId);
                 if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + r.statusText);
                 return r.json();
             }).then(function(resp){
-                if (resp && resp.bestmove) { makeStockfishMove(resp.bestmove); }
-                if (resp && resp.bestmove) { makeStockfishMove(resp.bestmove); }
+                if (resp && resp.bestmove) {
+                    makeStockfishMove(resp.bestmove);
+                }
                 else if (resp && resp.error) {
                     console.warn('Engine responded with error:', resp.error);
                     $('#chess-status').text('Engine error: ' + resp.error);
@@ -929,11 +934,13 @@ function makeStockfishMove(bestmove) {
                 }
             }).catch(function(err){
                 stockfishGame.fetchInFlight = false;
-                console.error('Stockfish fetch error:', err);
+                clearTimeout(timeoutId);
+                console.error('Stockfish fetch error:', err.name || err.message || err);
                 if (retries > 0) {
                     // exponential backoff retry
-                    var wait = 300 * Math.pow(2, 3 - retries);
+                    var wait = 500 * Math.pow(2, 3 - retries);
                     console.warn('Retrying stockfish fetch in', wait, 'ms (retries left:', retries - 1 + ')');
+                    $('#chess-status').text('Engine busy, retrying...');
                     setTimeout(function(){ attemptFetch(retries - 1); }, wait);
                 } else {
                     $('#chess-status').text('Engine error (network)');
@@ -1506,10 +1513,26 @@ function ready() {
     function popup_message (message, clicktoclosepopup, clicktoreload) {
         $('#popup').text(message).removeClass('hidden');
         $('body > *:not(#popup)').addClass('opaque');
-        if (clicktoclosepopup)
-            $(document).on('click keydown', function() { $(document).off('click keydown'); $('#popup').addClass('hidden'); $('body > *:not(#popup)').removeClass('opaque'); });
-        else if (clicktoreload)
-            $(document).on('click keydown', function() { $(document).off('click keydown'); $(document).off('keydown'); try { if (ws && typeof ws.close === 'function') ws.close(); } catch(e){} try { ready(); } catch(e){} });
+        if (clicktoclosepopup) {
+            var handler = function(e) {
+                $(document).off('click.popup keydown.popup', handler);
+                $('#popup').addClass('hidden');
+                $('body > *:not(#popup)').removeClass('opaque');
+            };
+            $(document).on('click.popup keydown.popup', handler);
+        }
+        else if (clicktoreload) {
+            var handler = function(e) {
+                // Don't reload if a Stockfish game is in progress
+                if (stockfishGame && !stockfishGame.over) {
+                    return;
+                }
+                $(document).off('click.popup keydown.popup', handler);
+                try { if (ws && typeof ws.close === 'function') ws.close(); } catch(err){}
+                try { ready(); } catch(err){}
+            };
+            $(document).on('click.popup keydown.popup', handler);
+        }
     }
 
     if (!window.WebSocket) {

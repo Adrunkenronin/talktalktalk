@@ -847,24 +847,31 @@ function makeStockfishMove(bestmove, retries) {
         var position = board.fen();
         var depth = stockfishGame.depth;
         $('#chess-status').text('Engine thinking...');
+        var controller = new AbortController();
+        var timeoutId = setTimeout(function(){ controller.abort(); }, 12000);
         fetch('/api/stockfish/move', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fen: position, depth: depth, elo: stockfishGame.elo })
+            body: JSON.stringify({ fen: position, depth: depth, elo: stockfishGame.elo }),
+            signal: controller.signal
         }).then(function(r){
+            clearTimeout(timeoutId);
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.json();
         }).then(function(resp){
             if (resp && resp.bestmove) { makeStockfishMove(resp.bestmove); }
-            else if (resp && resp.error && retries < 2) {
-                setTimeout(function() { makeStockfishMove(null, retries + 1); }, 500);
+            else if (resp && resp.error && retries < 3) {
+                $('#chess-status').text('Engine busy, retrying...');
+                setTimeout(function() { makeStockfishMove(null, retries + 1); }, 1000);
             }
             else {
                 $('#chess-status').text('Engine error, please try again');
             }
         }).catch(function(err){
-            if (retries < 2) {
-                setTimeout(function() { makeStockfishMove(null, retries + 1); }, 500);
+            clearTimeout(timeoutId);
+            if (retries < 3) {
+                $('#chess-status').text('Engine busy, retrying...');
+                setTimeout(function() { makeStockfishMove(null, retries + 1); }, 1000);
             } else {
                 $('#chess-status').text('Engine error, please reload');
             }
@@ -1189,10 +1196,26 @@ function ready() {
     function popup_message (message, clicktoclosepopup, clicktoreload) {
         $('#popup').text(message).removeClass('hidden');
         $('body > *:not(#popup)').addClass('opaque');
-        if (clicktoclosepopup)
-            $(document).on('click keydown', function() { $(document).off('click keydown'); $('#popup').addClass('hidden'); $('body > *:not(#popup)').removeClass('opaque'); });
-        else if (clicktoreload)
-            $(document).on('click keydown', function() { $(document).off('click keydown'); $(document).off('keydown'); ws.close(); ready(); });
+        if (clicktoclosepopup) {
+            var handler = function(e) {
+                $(document).off('click.popup keydown.popup', handler);
+                $('#popup').addClass('hidden');
+                $('body > *:not(#popup)').removeClass('opaque');
+            };
+            $(document).on('click.popup keydown.popup', handler);
+        }
+        else if (clicktoreload) {
+            var handler = function(e) {
+                // Don't reload if a Stockfish game is in progress
+                if (stockfishGame && !stockfishGame.over) {
+                    return;
+                }
+                $(document).off('click.popup keydown.popup', handler);
+                try { ws.close(); } catch(err){}
+                try { ready(); } catch(err){}
+            };
+            $(document).on('click.popup keydown.popup', handler);
+        }
     }
 
     if (!window.WebSocket) {
