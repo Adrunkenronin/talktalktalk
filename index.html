@@ -1473,6 +1473,17 @@ function ready() {
     firstId = Infinity;
     lastId = -1;
 
+    // Unmute audio on first user interaction to comply with browser autoplay policies
+    function unmuteAudioOnInteraction() {
+        if (!__audioUnmuted) {
+            popsound.muted = false;
+            __audioUnmuted = true;
+            // Remove listeners after first interaction
+            $(document).off('click.audio keydown.audio');
+        }
+    }
+    $(document).on('click.audio keydown.audio', unmuteAudioOnInteraction);
+
     if (mediaPlaybackRequiresUserGesture()) { // mobile devices require user gesture to trigger a play. "Notifications" off for them.
         $('#notificationswitch').text('off');
     }
@@ -2136,7 +2147,7 @@ window.addEventListener('unhandledrejection', function(ev) {
     var reason = ev && ev.reason ? ev.reason : ev;
     var msg = (reason && reason.message) ? reason.message : String(reason);
     if (msg && (msg.indexOf('IFrame evaluation timeout') !== -1 || msg.indexOf('cdn.builder.io') !== -1 || msg.indexOf('IFrame evaluation') !== -1)) {
-      // Non-fatal external iframe timeout from third-party script �� log and prevent uncaught rejection
+      // Non-fatal external iframe timeout from third-party script — log and prevent uncaught rejection
       console.warn('Suppressed external iframe error:', msg, reason);
       ev.preventDefault && ev.preventDefault();
       return;
