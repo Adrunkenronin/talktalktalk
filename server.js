@@ -179,12 +179,26 @@ app.post('/api/stockfish/move', async (req, res) => {
   if (!depth && elo) depth = eloToDepth(elo);
   if (!depth) depth = 8;
 
+  // Diagnostic logging to help debug Network/engine issues
+  try {
+    console.log('[stockfish] request', {
+      time: new Date().toISOString(),
+      ip: req.ip,
+      forwarded: req.headers['x-forwarded-for'] || null,
+      body: req.body
+    });
+  } catch (_) {}
+
   try {
     const best = bestMoveFallback(fen, depth);
-    if (!best) return res.status(422).json({ error: 'no_move' });
-    res.json({ bestmove: best });
+    if (!best) {
+      console.warn('[stockfish] no_move for fen', fen);
+      return res.status(422).json({ error: 'no_move' });
+    }
+    return res.json({ bestmove: best });
   } catch (e) {
-    res.status(500).json({ error: 'engine_error' });
+    console.error('[stockfish] engine error', e && e.stack ? e.stack : e);
+    return res.status(500).json({ error: 'engine_error' });
   }
 });
 
