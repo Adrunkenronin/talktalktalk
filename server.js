@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
+const { spawn } = require('child_process');
 const WebSocket = require('ws');
 const sanitizeHtml = require('sanitize-html');
 const ChessCtor = require('chess.js').Chess;
@@ -121,68 +122,94 @@ function eloToDepth(elo) {
 }
 
 async function bestMoveWithStockfish(fen, depth) {
-  // Try to use the stockfish npm package when available. This runs the engine in-process
-  // and returns the bestmove string (e.g. 'e2e4' or 'e7e8q'). Will timeout and return null
-  // on failure so caller can fallback to the JS fallback engine.
+  // First try bundled npm package if available
   try {
     if (!StockfishFactory) {
       try { StockfishFactory = require('stockfish'); } catch (e) { StockfishFactory = null; }
     }
-    if (!StockfishFactory) return null;
+    if (StockfishFactory) {
+      const engine = StockfishFactory();
+      return await new Promise((resolve) => {
+        let settled = false;
+        const cleanup = () => {
+          try { if (engine.postMessage) engine.postMessage('quit'); } catch (_) {}
+        };
+        const onMessage = (ev) => {
+          const msg = typeof ev === 'string' ? ev : (ev && ev.data ? ev.data : '');
+          if (!msg) return;
+          if (msg.indexOf('bestmove') === 0) {
+            const parts = msg.split(' ');
+            const mv = parts[1] || null;
+            if (!settled) { settled = true; cleanup(); resolve(mv); }
+          }
+        };
+        try {
+          if (typeof engine.onmessage !== 'undefined') engine.onmessage = onMessage;
+          if (typeof engine.addEventListener === 'function') engine.addEventListener('message', onMessage);
+        } catch (_) {}
+        const safeDepth = Math.max(1, Math.min(Number(depth) || 8, 12));
+        try {
+          engine.postMessage('uci'); engine.postMessage('isready');
+          engine.postMessage('position fen ' + fen); engine.postMessage('go depth ' + safeDepth);
+        } catch (e) {
+          try { engine('uci'); engine('isready'); engine('position fen ' + fen); engine('go depth ' + safeDepth); } catch (e2) {}
+        }
+        const to = setTimeout(() => { if (!settled) { settled = true; try { cleanup(); } catch(_){}; resolve(null); } }, 4000);
+        const origResolve = resolve; resolve = (v) => { clearTimeout(to); origResolve(v); };
+      });
+    }
 
-    const engine = StockfishFactory();
+    // Fallback to spawning system stockfish binary
     return await new Promise((resolve) => {
       let settled = false;
-      const cleanup = () => {
-        try {
-          if (engine.postMessage) engine.postMessage('quit');
-        } catch (_) {}
-      };
-
-      const onMessage = (ev) => {
-        const msg = typeof ev === 'string' ? ev : (ev && ev.data ? ev.data : '');
-        if (!msg) return;
-        // console.log('[stockfish] msg', msg);
-        if (msg.indexOf('bestmove') === 0) {
-          const parts = msg.split(' ');
-          const mv = parts[1] || null;
-          if (!settled) {
-            settled = true;
-            cleanup();
-            resolve(mv);
-          }
-        }
-      };
-
+      let stdoutBuf = '';
+      let stderrBuf = '';
+      let child;
       try {
-        if (typeof engine.onmessage !== 'undefined') engine.onmessage = onMessage;
-        if (typeof engine.addEventListener === 'function') engine.addEventListener('message', onMessage);
-      } catch (_) {}
-
-      // Safety limits
-      const safeDepth = Math.max(1, Math.min(Number(depth) || 8, 12));
-      try {
-        engine.postMessage('uci');
-        engine.postMessage('isready');
-        engine.postMessage('position fen ' + fen);
-        engine.postMessage('go depth ' + safeDepth);
+        child = spawn('stockfish');
       } catch (e) {
-        // Some builds expect .postMessage while others are functions. Try function-style too.
-        try {
-          engine('uci'); engine('isready'); engine('position fen ' + fen); engine('go depth ' + safeDepth);
-        } catch (e2) {}
+        return resolve(null);
       }
 
-      // Timeout after 3s
-      const to = setTimeout(() => {
-        if (!settled) {
-          settled = true;
-          try { cleanup(); } catch (_) {}
-          resolve(null);
-        }
-      }, 3000);
+      const cleanup = () => {
+        try { if (child && !child.killed) child.kill(); } catch (_) {}
+        try { if (child && child.stdout) child.stdout.removeAllListeners(); } catch(_){}
+        try { if (child && child.stderr) child.stderr.removeAllListeners(); } catch(_){}
+      };
 
-      // When resolved, clear timeout
+      const onStdout = (chunk) => {
+        try {
+          stdoutBuf += chunk.toString();
+          const lines = stdoutBuf.split(/\r?\n/);
+          stdoutBuf = lines.pop();
+          for (const line of lines) {
+            if (!line) continue;
+            if (line.indexOf('bestmove') === 0) {
+              const parts = line.split(' ');
+              const mv = parts[1] || null;
+              if (!settled) { settled = true; cleanup(); resolve(mv); }
+            }
+          }
+        } catch (e) {}
+      };
+      const onStderr = (chunk) => { try { stderrBuf += chunk.toString(); } catch(e){} };
+      const onError = () => { if (!settled) { settled = true; cleanup(); resolve(null); } };
+
+      child.stdout.on('data', onStdout);
+      child.stderr.on('data', onStderr);
+      child.on('error', onError);
+      child.on('exit', (code) => { if (!settled) { settled = true; cleanup(); resolve(null); } });
+
+      const safeDepth = Math.max(1, Math.min(Number(depth) || 8, 20));
+      try {
+        child.stdin.write('uci\n');
+        child.stdin.write('isready\n');
+        child.stdin.write('position fen ' + fen + '\n');
+        child.stdin.write('go depth ' + safeDepth + '\n');
+      } catch (e) {}
+
+      const to = setTimeout(() => { if (!settled) { settled = true; cleanup(); resolve(null); } }, 6000);
+      // Ensure timeout is cleared if resolved
       const origResolve = resolve;
       resolve = (v) => { clearTimeout(to); origResolve(v); };
     });
