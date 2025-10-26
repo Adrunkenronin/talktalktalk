@@ -860,12 +860,22 @@ function makeStockfishMove(bestmove) {
         var position = board.fen();
         var depth = stockfishGame.depth;
         (function attemptFetch(retries){
+            if (!stockfishGame) return;
+            stockfishGame.fetchInFlight = stockfishGame.fetchInFlight || false;
+            if (stockfishGame.fetchInFlight) {
+                // Another fetch is already in flight — retry shortly
+                if (retries > 0) { setTimeout(function(){ attemptFetch(retries - 1); }, 150); }
+                else { $('#chess-status').text('Engine busy, try again'); }
+                return;
+            }
+            stockfishGame.fetchInFlight = true;
             var url = (API_BASE || '') + '/api/stockfish/move';
             fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ fen: position, depth: depth, elo: stockfishGame.elo })
             }).then(function(r){
+                stockfishGame.fetchInFlight = false;
                 if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + r.statusText);
                 return r.json();
             }).then(function(resp){
@@ -878,6 +888,7 @@ function makeStockfishMove(bestmove) {
                     $('#chess-status').text('Engine returned invalid response');
                 }
             }).catch(function(err){
+                stockfishGame.fetchInFlight = false;
                 console.error('Stockfish fetch error:', err);
                 if (retries > 0) {
                     // exponential backoff retry
