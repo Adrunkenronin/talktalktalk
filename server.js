@@ -203,31 +203,36 @@ function bestMoveFallback(fen, depth) {
 
 app.post('/api/stockfish/move', async (req, res) => {
   const fen = String(req.body && req.body.fen || '').trim();
-  let depth = Number(req.body && (req.body.depth ?? 0));
-  const elo = Number(req.body && (req.body.elo ?? 0));
+  const elo = Number(req.body && (req.body.elo ?? 600));
   if (!fen) return res.status(400).json({ error: 'fen required' });
-  if (!depth && elo) depth = eloToDepth(elo);
-  if (!depth) depth = 8;
 
   // Diagnostic logging to help debug Network/engine issues
   try {
-    console.log('[stockfish] request', {
+    console.log('[engine] request', {
       time: new Date().toISOString(),
       ip: req.ip,
-      forwarded: req.headers['x-forwarded-for'] || null,
-      body: req.body
+      elo: elo
     });
   } catch (_) {}
 
   try {
-    const best = bestMoveFallback(fen, depth);
+    // Try Lichess API first for real Stockfish moves
+    let best = await getBestMoveFromLichess(fen, elo);
+
+    // If Lichess fails (rate limited, offline, etc), fall back to local algorithm
     if (!best) {
-      console.warn('[stockfish] no_move for fen', fen);
+      console.log('[engine] Lichess unavailable, using local fallback algorithm');
+      const depthConfig = eloToDepth(elo);
+      best = bestMoveFallback(fen, depthConfig.maxDepth);
+    }
+
+    if (!best) {
+      console.warn('[engine] no_move for fen', fen);
       return res.status(422).json({ error: 'no_move' });
     }
     return res.json({ bestmove: best });
   } catch (e) {
-    console.error('[stockfish] engine error', e && e.stack ? e.stack : e);
+    console.error('[engine] error', e && e.stack ? e.stack : e);
     return res.status(500).json({ error: 'engine_error' });
   }
 });
