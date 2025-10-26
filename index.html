@@ -685,6 +685,8 @@ html {
 </div>
 <script type="text/javascript">
 var popsound = new Audio('popsound.mp3');
+// API base: if page is opened via file:// fallback to localhost dev server
+var API_BASE = (location.protocol === 'file:') ? (window.__API_BASE_OVERRIDE__ || 'http://localhost:12000') : '';
 var randomname = 'user' + Math.floor((Math.random() * 1000) + 1);
 var displayeduser;
 var ws;
