@@ -105,7 +105,7 @@ function evaluateBoardMaterial(chess) {
 function bestMoveFallback(fen, depth) {
   const chess = new ChessCtor();
   try { chess.load(fen); } catch (_) { return null; }
-  const maxDepth = Math.max(1, Math.min(4, Number(depth) || 2));
+  const maxDepth = Math.max(1, Number(depth) || 5);
   const player = chess.turn();
   function negamax(d, alpha, beta) {
     if (d === 0 || chess.game_over()) {
