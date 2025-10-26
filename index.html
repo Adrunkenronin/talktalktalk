@@ -786,44 +786,50 @@ function eloToDepth(elo) {
 }
 
 function startStockfishGame(playerColor, elo) {
-    if (!stockfishEngine) initializeStockfish();
-    if (typeof Chess === 'undefined') {
-        alert('Chess library not loaded. Please refresh the page.');
-        return;
-    }
-    var board = new Chess();
-    stockfishGame = {
-        board: board,
-        fen: board.fen(),
-        turn: 'w',
-        color: playerColor === 'white' ? 'w' : 'b',
-        engineColor: playerColor === 'white' ? 'b' : 'w',
-        elo: elo,
-        depth: eloToDepth(elo),
-        over: false
-    };
-    var me = $('#username').text();
-    chessGame = {
-        id: 'stockfish_' + Date.now(),
-        white: playerColor === 'white' ? me : 'Stockfish (' + elo + ')',
-        black: playerColor === 'black' ? me : 'Stockfish (' + elo + ')',
-        color: playerColor === 'white' ? 'white' : 'black',
-        fen: board.fen(),
-        turn: 'white',
-        lastMove: null,
-        over: false,
-        moveHistory: [{ fen: board.fen(), from: null, to: null }],
-        historyIndex: 0
-    };
-    $('#chess-white').text(chessGame.white);
-    $('#chess-black').text(chessGame.black);
-    $('#chess-status').text('Your color: ' + playerColor);
-    pendingUserMove = null; premoveQueue = []; updateConfirmButton();
-    renderBoard();
-    updateHistoryControls && updateHistoryControls();
-    $('#chess-modal').removeClass('hidden');
-    if (playerColor === 'black') {
-        setTimeout(function() { makeStockfishMove(); }, 500);
+    try {
+        if (!stockfishEngine) initializeStockfish();
+        if (typeof Chess === 'undefined') {
+            alert('Chess library not loaded. Please refresh the page.');
+            return;
+        }
+        var board = new Chess();
+        stockfishGame = {
+            board: board,
+            fen: board.fen(),
+            turn: 'w',
+            color: playerColor === 'white' ? 'w' : 'b',
+            engineColor: playerColor === 'white' ? 'b' : 'w',
+            elo: elo,
+            depth: eloToDepth(elo),
+            over: false
+        };
+        var me = $('#username').text();
+        chessGame = {
+            id: 'stockfish_' + Date.now(),
+            white: playerColor === 'white' ? me : 'Stockfish (' + elo + ')',
+            black: playerColor === 'black' ? me : 'Stockfish (' + elo + ')',
+            color: playerColor === 'white' ? 'white' : 'black',
+            fen: board.fen(),
+            turn: 'white',
+            lastMove: null,
+            over: false,
+            moveHistory: [{ fen: board.fen(), from: null, to: null }],
+            historyIndex: 0
+        };
+        $('#chess-white').text(chessGame.white);
+        $('#chess-black').text(chessGame.black);
+        $('#chess-status').text('Your color: ' + playerColor);
+        pendingUserMove = null; premoveQueue = []; updateConfirmButton();
+        renderBoard();
+        updateHistoryControls && updateHistoryControls();
+        $('#chess-modal').removeClass('hidden');
+        if (playerColor === 'black') {
+            setTimeout(function() { makeStockfishMove(); }, 500);
+        }
+    } catch (err) {
+        console.error('startStockfishGame error:', err);
+        flashStatus('Error starting engine: ' + (err && err.message ? err.message : String(err)));
+        alert('Error starting Stockfish: ' + (err && err.message ? err.message : String(err)));
     }
 }
 
