@@ -361,6 +361,40 @@ function bestMoveFallback(fen, depth) {
   return bestMove.from + bestMove.to + (promo || '');
 }
 
+app.get('/api/stockfish/version', async (req, res) => {
+  try {
+    let name = null;
+    let version = null;
+    const child = spawn('stockfish');
+    let stdoutBuf = '';
+    const to = setTimeout(() => {
+      try { if (child && !child.killed) child.kill(); } catch(_){}
+      return res.json({ name, version });
+    }, 3000);
+    child.stdout.on('data', (chunk) => {
+      try {
+        stdoutBuf += chunk.toString();
+        const lines = stdoutBuf.split(/\r?\n/);
+        stdoutBuf = lines.pop();
+        for (const line of lines) {
+          if (line.indexOf('id name') === 0) name = line.replace(/^id name\s+/, '').trim();
+          if (line.indexOf('id version') === 0) version = line.replace(/^id version\s+/, '').trim();
+          if (line.indexOf('uciok') === 0) {
+            clearTimeout(to);
+            try { if (child && !child.killed) child.kill(); } catch(_){}
+            return res.json({ name, version });
+          }
+        }
+      } catch (e) {}
+    });
+    child.stderr.on('data', () => {});
+    child.on('error', () => { clearTimeout(to); try { if (child && !child.killed) child.kill(); } catch(_){}; return res.json({ name, version }); });
+    child.stdin.write('uci\n');
+  } catch (e) {
+    return res.status(500).json({ error: 'spawn_failed' });
+  }
+});
+
 app.post('/api/stockfish/move', async (req, res) => {
   const fen = String(req.body && req.body.fen || '').trim();
   let depth = Number(req.body && (req.body.depth ?? 0));
