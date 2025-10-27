@@ -770,19 +770,21 @@ function eloToDepth(elo) {
         { elo: 2400, depth: 18 }
     ];
 
-    if (rating <= eloDepthMap[0].elo) return eloDepthMap[0].depth;
-    if (rating >= eloDepthMap[eloDepthMap.length - 1].elo) return eloDepthMap[eloDepthMap.length - 1].depth;
-
-    for (var i = 0; i < eloDepthMap.length - 1; i++) {
-        if (rating >= eloDepthMap[i].elo && rating <= eloDepthMap[i + 1].elo) {
-            var lower = eloDepthMap[i];
-            var upper = eloDepthMap[i + 1];
-            var ratio = (rating - lower.elo) / (upper.elo - lower.elo);
-            return Math.round(lower.depth + (upper.depth - lower.depth) * ratio);
+    var depthOut = 8;
+    if (rating <= eloDepthMap[0].elo) depthOut = eloDepthMap[0].depth;
+    else if (rating >= eloDepthMap[eloDepthMap.length - 1].elo) depthOut = eloDepthMap[eloDepthMap.length - 1].depth;
+    else {
+        for (var i = 0; i < eloDepthMap.length - 1; i++) {
+            if (rating >= eloDepthMap[i].elo && rating <= eloDepthMap[i + 1].elo) {
+                var lower = eloDepthMap[i];
+                var upper = eloDepthMap[i + 1];
+                var ratio = (rating - lower.elo) / (upper.elo - lower.elo);
+                depthOut = Math.round(lower.depth + (upper.depth - lower.depth) * ratio);
+                break;
+            }
         }
     }
-
-    return 8;
+    return Math.min(depthOut, 8);
 }
 
 function startStockfishGame(playerColor, elo) {

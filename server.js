@@ -1,7 +1,8 @@
-const express = require('express');
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
+const express = require('express');
+const { spawn } = require('child_process');
 const WebSocket = require('ws');
 const sanitizeHtml = require('sanitize-html');
 const ChessCtor = require('chess.js').Chess;
@@ -82,6 +83,8 @@ const wss = new WebSocket.Server({ server });
 
 // Stockfish WASM module is unreliable on server-side, using fallback algorithm instead
 let StockfishFactory = null;
+// Track last engine move per position to avoid immediate repeats (in-memory)
+const lastEngineMoveByFen = new Map();
 
 function eloToDepth(elo) {
   const rating = Number(elo) || 600;
@@ -102,23 +105,203 @@ function eloToDepth(elo) {
     { elo: 2400, depth: 18 }
   ];
 
-  if (rating <= eloDepthMap[0].elo) return eloDepthMap[0].depth;
-  if (rating >= eloDepthMap[eloDepthMap.length - 1].elo) return eloDepthMap[eloDepthMap.length - 1].depth;
-
-  for (let i = 0; i < eloDepthMap.length - 1; i++) {
-    if (rating >= eloDepthMap[i].elo && rating <= eloDepthMap[i + 1].elo) {
-      const lower = eloDepthMap[i];
-      const upper = eloDepthMap[i + 1];
-      const ratio = (rating - lower.elo) / (upper.elo - lower.elo);
-      return Math.round(lower.depth + (upper.depth - lower.depth) * ratio);
+  let depthOut = 8;
+  if (rating <= eloDepthMap[0].elo) depthOut = eloDepthMap[0].depth;
+  else if (rating >= eloDepthMap[eloDepthMap.length - 1].elo) depthOut = eloDepthMap[eloDepthMap.length - 1].depth;
+  else {
+    for (let i = 0; i < eloDepthMap.length - 1; i++) {
+      if (rating >= eloDepthMap[i].elo && rating <= eloDepthMap[i + 1].elo) {
+        const lower = eloDepthMap[i];
+        const upper = eloDepthMap[i + 1];
+        const ratio = (rating - lower.elo) / (upper.elo - lower.elo);
+        depthOut = Math.round(lower.depth + (upper.depth - lower.depth) * ratio);
+        break;
+      }
     }
   }
-
-  return 8;
+  // Cap to a safe maximum to avoid CPU spikes
+  return Math.min(depthOut, 8);
 }
 
-async function bestMoveWithStockfish(fen, depth) {
-  return null;
+async function bestMoveWithStockfish(fen, depth, elo) {
+  // Use UCI options (limit strength), request MultiPV, use movetime with jitter, and sample top PVs
+  try {
+    function computeMoveTime(eloVal, depthVal) {
+      const e = Number(eloVal) || 1200;
+      const mt = Math.round(200 + (Math.max(400, Math.min(2400, e)) - 400) / (2400 - 400) * 1800);
+      const depthBoost = Math.max(0, (Number(depthVal) || 8) - 8) * 150;
+      return Math.min(5000, mt + depthBoost);
+    }
+    const movetime = computeMoveTime(elo, depth);
+    const multipv = 3;
+
+    if (!StockfishFactory) {
+      try { StockfishFactory = require('stockfish'); } catch (e) { StockfishFactory = null; }
+    }
+
+    const sampleMove = (cands) => {
+      if (!cands || cands.length === 0) return null;
+      if (cands.length === 1) return cands[0];
+      const weights = cands.map((_, i) => (i === 0 ? 0.7 : i === 1 ? 0.2 : 0.1));
+      const total = weights.slice(0, cands.length).reduce((a, b) => a + b, 0);
+      let r = Math.random() * total;
+      for (let i = 0; i < cands.length; i++) {
+        r -= weights[i];
+        if (r <= 0) return cands[i];
+      }
+      return cands[0];
+    };
+
+    if (StockfishFactory) {
+      const engine = StockfishFactory();
+      return await new Promise((resolve) => {
+        let settled = false;
+        const pvMap = {};
+        const cleanup = () => { try { if (engine.postMessage) engine.postMessage('quit'); } catch(_){} };
+        const onMessage = (ev) => {
+          const msg = typeof ev === 'string' ? ev : (ev && ev.data ? ev.data : '');
+          if (!msg) return;
+          try {
+            if (msg.indexOf('info') === 0 && msg.indexOf('pv ') !== -1) {
+              const m = msg.match(/multipv\s+(\d+)/);
+              const mv = msg.match(/pv\s+(.+)$/);
+              if (mv) {
+                const pvStr = mv[1].trim();
+                const mp = m ? Number(m[1]) : 1;
+                pvMap[mp] = pvStr;
+              }
+            }
+            if (msg.indexOf('bestmove') === 0) {
+              const parts = msg.split(' ');
+              const mv = parts[1] || null;
+              if (!settled) {
+                settled = true;
+                cleanup();
+                const keys = Object.keys(pvMap).map(Number).sort((a,b)=>a-b);
+                const cands = keys.map(k => (pvMap[k] ? pvMap[k].split(' ')[0] : null)).filter(Boolean);
+                let chosen = sampleMove(cands) || mv;
+                try {
+                  const prev = lastEngineMoveByFen.get(fen);
+                  const isSame = prev && chosen === prev;
+                  const isReverse = prev && prev.length >= 4 && chosen && chosen.length >= 4 && chosen.substring(0,2) === prev.substring(2,4) && chosen.substring(2,4) === prev.substring(0,2);
+                  if ((isSame || isReverse) && cands.length > 1) {
+                    const alt = cands.find(m => m !== prev && !(m.substring(0,2) === prev.substring(2,4) && m.substring(2,4) === prev.substring(0,2)));
+                    if (alt) chosen = alt;
+                  }
+                  lastEngineMoveByFen.set(fen, chosen);
+                } catch (e) {}
+                console.info('[stockfish] pv', { fen: fen, candidates: cands, chosen: chosen, raw_bestmove: mv });
+                resolve(chosen);
+              }
+            }
+          } catch (e) {}
+        };
+        try {
+          if (typeof engine.onmessage !== 'undefined') engine.onmessage = onMessage;
+          if (typeof engine.addEventListener === 'function') engine.addEventListener('message', onMessage);
+        } catch (_) {}
+
+        try {
+          if (engine.postMessage) {
+            engine.postMessage('uci');
+            engine.postMessage('setoption name UCI_LimitStrength value true');
+            if (Number(elo)) engine.postMessage('setoption name UCI_Elo value ' + Number(elo));
+            engine.postMessage('setoption name MultiPV value ' + multipv);
+            engine.postMessage('isready');
+            engine.postMessage('position fen ' + fen);
+            const jitter = Math.round(Math.random() * Math.min(300, Math.round(movetime / 4)));
+            engine.postMessage('go movetime ' + Math.max(100, movetime + (Math.random() < 0.5 ? -jitter : jitter)));
+          } else if (typeof engine === 'function') {
+            engine('uci'); engine('setoption name UCI_LimitStrength value true');
+            if (Number(elo)) engine('setoption name UCI_Elo value ' + Number(elo));
+            engine('setoption name MultiPV value ' + multipv);
+            engine('isready');
+            engine('position fen ' + fen);
+            const jitter = Math.round(Math.random() * Math.min(300, Math.round(movetime / 4)));
+            engine('go movetime ' + Math.max(100, movetime + (Math.random() < 0.5 ? -jitter : jitter)));
+          }
+        } catch (e) {}
+
+        const to = setTimeout(() => { if (!settled) { settled = true; try{cleanup();}catch(_){ } ; resolve(null); } }, Math.min(10000, movetime + 4000));
+        const origResolve = resolve; resolve = (v) => { clearTimeout(to); origResolve(v); };
+      });
+    }
+
+    // spawn system binary
+    return await new Promise((resolve) => {
+      let settled = false;
+      let stdoutBuf = '';
+      const pvMap = {};
+      let child;
+      try { child = spawn('stockfish'); } catch (e) { return resolve(null); }
+      const cleanup = () => { try { if (child && !child.killed) child.kill(); } catch(_){}; try { if (child && child.stdout) child.stdout.removeAllListeners(); } catch(_){}; try { if (child && child.stderr) child.stderr.removeAllListeners(); } catch(_){} };
+      const onStdout = (chunk) => {
+        try {
+          stdoutBuf += chunk.toString();
+          const lines = stdoutBuf.split(/\r?\n/);
+          stdoutBuf = lines.pop();
+          for (const line of lines) {
+            if (!line) continue;
+            if (line.indexOf('info') === 0 && line.indexOf('pv ') !== -1) {
+              const m = line.match(/multipv\s+(\d+)/);
+              const mv = line.match(/pv\s+(.+)$/);
+              if (mv) {
+                const pvStr = mv[1].trim();
+                const mp = m ? Number(m[1]) : 1;
+                pvMap[mp] = pvStr;
+              }
+            }
+            if (line.indexOf('bestmove') === 0) {
+              const parts = line.split(' ');
+              const mv = parts[1] || null;
+              if (!settled) {
+                settled = true;
+                cleanup();
+                const keys = Object.keys(pvMap).map(Number).sort((a,b)=>a-b);
+                const cands = keys.map(k => (pvMap[k] ? pvMap[k].split(' ')[0] : null)).filter(Boolean);
+                let chosen = sampleMove(cands) || mv;
+                try {
+                  const prev = lastEngineMoveByFen.get(fen);
+                  const isSame = prev && chosen === prev;
+                  const isReverse = prev && prev.length >= 4 && chosen && chosen.length >= 4 && chosen.substring(0,2) === prev.substring(2,4) && chosen.substring(2,4) === prev.substring(0,2);
+                  if ((isSame || isReverse) && cands.length > 1) {
+                    const alt = cands.find(m => m !== prev && !(m.substring(0,2) === prev.substring(2,4) && m.substring(2,4) === prev.substring(0,2)));
+                    if (alt) chosen = alt;
+                  }
+                  lastEngineMoveByFen.set(fen, chosen);
+                } catch (e) {}
+                console.info('[stockfish] pv', { fen: fen, candidates: cands, chosen: chosen, raw_bestmove: mv });
+                resolve(chosen);
+              }
+            }
+          }
+        } catch (e) {}
+      };
+      child.stdout.on('data', onStdout);
+      child.stderr.on('data', (c) => {});
+      child.on('error', () => { if (!settled) { settled = true; cleanup(); resolve(null); } });
+      child.on('exit', () => { if (!settled) { settled = true; cleanup(); resolve(null); } });
+
+      try {
+        child.stdin.write('uci\n');
+        child.stdin.write('setoption name UCI_LimitStrength value true\n');
+        if (Number(elo)) child.stdin.write('setoption name UCI_Elo value ' + Number(elo) + '\n');
+        child.stdin.write('setoption name MultiPV value ' + multipv + '\n');
+        child.stdin.write('isready\n');
+        child.stdin.write('position fen ' + fen + '\n');
+        const jitter = Math.round(Math.random() * Math.min(300, Math.round(movetime / 4)));
+        const actual = Math.max(100, movetime + (Math.random() < 0.5 ? -jitter : jitter));
+        child.stdin.write('go movetime ' + actual + '\n');
+      } catch (e) {}
+
+      const to = setTimeout(() => { if (!settled) { settled = true; cleanup(); resolve(null); } }, Math.min(10000, movetime + 4000));
+      const origResolve = resolve; resolve = (v) => { clearTimeout(to); origResolve(v); };
+    });
+
+  } catch (e) {
+    console.error('[stockfish] engine integration error', e && e.stack ? e.stack : e);
+    return null;
+  }
 }
 
 function evaluateBoardMaterial(chess) {
@@ -138,10 +321,14 @@ function evaluateBoardMaterial(chess) {
 function bestMoveFallback(fen, depth) {
   const chess = new ChessCtor();
   try { chess.load(fen); } catch (_) { return null; }
-  const maxDepth = Math.max(1, Number(depth) || 5);
+  const maxDepth = Math.max(1, Math.min(Number(depth) || 5, 8));
+  const deadline = Date.now() + 900; // ms budget per move
   const player = chess.turn();
+
+  function timeUp() { return Date.now() > deadline; }
+
   function negamax(d, alpha, beta) {
-    if (d === 0 || chess.game_over()) {
+    if (d === 0 || chess.game_over() || timeUp()) {
       const evalScore = evaluateBoardMaterial(chess);
       return player === 'w' ? evalScore : -evalScore;
     }
@@ -154,13 +341,16 @@ function bestMoveFallback(fen, depth) {
       if (score > best) best = score;
       if (score > alpha) alpha = score;
       if (alpha >= beta) break;
+      if (timeUp()) break;
     }
     return best;
   }
+
   let bestMove = null;
   let bestScore = -Infinity;
   const moves = chess.moves({ verbose: true });
   for (const m of moves) {
+    if (timeUp()) break;
     chess.move(m);
     const score = -negamax(maxDepth - 1, -Infinity, Infinity);
     chess.undo();
@@ -170,6 +360,40 @@ function bestMoveFallback(fen, depth) {
   const promo = bestMove.promotion ? bestMove.promotion : '';
   return bestMove.from + bestMove.to + (promo || '');
 }
+
+app.get('/api/stockfish/version', async (req, res) => {
+  try {
+    let name = null;
+    let version = null;
+    const child = spawn('stockfish');
+    let stdoutBuf = '';
+    const to = setTimeout(() => {
+      try { if (child && !child.killed) child.kill(); } catch(_){}
+      return res.json({ name, version });
+    }, 3000);
+    child.stdout.on('data', (chunk) => {
+      try {
+        stdoutBuf += chunk.toString();
+        const lines = stdoutBuf.split(/\r?\n/);
+        stdoutBuf = lines.pop();
+        for (const line of lines) {
+          if (line.indexOf('id name') === 0) name = line.replace(/^id name\s+/, '').trim();
+          if (line.indexOf('id version') === 0) version = line.replace(/^id version\s+/, '').trim();
+          if (line.indexOf('uciok') === 0) {
+            clearTimeout(to);
+            try { if (child && !child.killed) child.kill(); } catch(_){}
+            return res.json({ name, version });
+          }
+        }
+      } catch (e) {}
+    });
+    child.stderr.on('data', () => {});
+    child.on('error', () => { clearTimeout(to); try { if (child && !child.killed) child.kill(); } catch(_){}; return res.json({ name, version }); });
+    child.stdin.write('uci\n');
+  } catch (e) {
+    return res.status(500).json({ error: 'spawn_failed' });
+  }
+});
 
 app.post('/api/stockfish/move', async (req, res) => {
   const fen = String(req.body && req.body.fen || '').trim();
@@ -190,7 +414,10 @@ app.post('/api/stockfish/move', async (req, res) => {
   } catch (_) {}
 
   try {
-    const best = bestMoveFallback(fen, depth);
+    let best = await bestMoveWithStockfish(fen, depth, elo);
+    if (!best) {
+      best = bestMoveFallback(fen, depth);
+    }
     if (!best) {
       console.warn('[stockfish] no_move for fen', fen);
       return res.status(422).json({ error: 'no_move' });
