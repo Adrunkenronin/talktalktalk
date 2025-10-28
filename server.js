@@ -458,7 +458,7 @@ app.post('/api/stockfish/move', async (req, res) => {
 
   if (!fen) return res.status(400).json({ error: 'fen required' });
   if (!depth && elo) depth = eloToDepth(elo);
-  if (!depth) depth = 15;
+  if (!depth) depth = 12;
 
   try {
     console.log('[stockfish] request', {
@@ -471,7 +471,15 @@ app.post('/api/stockfish/move', async (req, res) => {
   } catch (_) {}
 
   try {
-    const best = await bestMoveWithStockfish(fen, depth, elo);
+    // Wrap with timeout to ensure we respond before browser timeout (10s)
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Engine search timeout')), 9000)
+    );
+
+    const searchPromise = bestMoveWithStockfish(fen, depth, elo);
+
+    const best = await Promise.race([searchPromise, timeoutPromise]);
+
     if (!best) {
       console.warn('[stockfish] no_move for fen', fen);
       return res.status(422).json({ error: 'no_move' });
