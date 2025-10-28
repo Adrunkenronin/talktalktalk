@@ -118,58 +118,104 @@ function eloToDepth(elo) {
   return 8;
 }
 
-async function bestMoveWithStockfish(fen, depth) {
-  return null;
+let stockfishEngine = null;
+const stockfishMessageQueue = [];
+let stockfishReady = false;
+const pendingSearches = new Map(); // searchId -> {resolve, reject, timeout}
+
+async function initStockfish() {
+  if (stockfishEngine) return stockfishEngine;
+
+  return new Promise((resolve, reject) => {
+    try {
+      stockfishEngine = new (Stockfish)();
+      let uciOkReceived = false;
+
+      stockfishEngine.onmessage = function(event) {
+        const line = event.data;
+        console.log('[stockfish-out]', line);
+
+        if (line === 'uciok') {
+          uciOkReceived = true;
+          stockfishReady = true;
+          console.log('[stockfish] Engine initialized and ready');
+          resolve(stockfishEngine);
+        } else if (line === 'readyok') {
+          // engine is ready for next command
+        } else if (line.startsWith('bestmove')) {
+          // Parse: bestmove e2e4 ponder e7e5
+          const parts = line.split(' ');
+          const move = parts[1]; // e.g., "e2e4"
+          const searchId = 'search_default';
+
+          if (pendingSearches.has(searchId)) {
+            const pending = pendingSearches.get(searchId);
+            clearTimeout(pending.timeout);
+            pending.resolve(move);
+            pendingSearches.delete(searchId);
+          }
+        }
+      };
+
+      // Send init commands
+      stockfishEngine.postMessage('uci');
+    } catch (err) {
+      reject(err);
+    }
+  });
 }
 
-function evaluateBoardMaterial(chess) {
-  const values = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 0 };
-  const board = chess.board();
-  let score = 0;
-  for (const row of board) {
-    for (const piece of row) {
-      if (!piece) continue;
-      const v = values[piece.type] || 0;
-      score += (piece.color === 'w') ? v : -v;
+async function bestMoveWithStockfish(fen, depth, elo) {
+  if (!stockfishEngine) {
+    try {
+      await initStockfish();
+    } catch (err) {
+      console.error('[stockfish] Failed to initialize engine:', err);
+      return null;
     }
   }
-  return score;
+
+  return new Promise((resolve) => {
+    try {
+      const searchId = 'search_default';
+      const timeout = setTimeout(() => {
+        if (pendingSearches.has(searchId)) {
+          pendingSearches.delete(searchId);
+        }
+        resolve(null);
+      }, 30000); // 30 second timeout
+
+      pendingSearches.set(searchId, { resolve, timeout });
+
+      // Send position and search command
+      stockfishEngine.postMessage(`position fen ${fen}`);
+
+      // If ELO is specified, set the skill level
+      if (elo && !isNaN(elo)) {
+        const skillLevel = eloToSkillLevel(elo);
+        stockfishEngine.postMessage(`setoption name Skill Level value ${skillLevel}`);
+      }
+
+      // Send go command with depth
+      const depthToUse = Math.max(1, Math.min(30, Number(depth) || 15));
+      stockfishEngine.postMessage(`go depth ${depthToUse}`);
+
+    } catch (err) {
+      console.error('[stockfish] Error during search:', err);
+      resolve(null);
+    }
+  });
 }
 
-function bestMoveFallback(fen, depth) {
-  const chess = new ChessCtor();
-  try { chess.load(fen); } catch (_) { return null; }
-  const maxDepth = Math.max(1, Number(depth) || 5);
-  const player = chess.turn();
-  function negamax(d, alpha, beta) {
-    if (d === 0 || chess.game_over()) {
-      const evalScore = evaluateBoardMaterial(chess);
-      return player === 'w' ? evalScore : -evalScore;
-    }
-    let best = -Infinity;
-    const moves = chess.moves({ verbose: true });
-    for (const m of moves) {
-      chess.move(m);
-      const score = -negamax(d - 1, -beta, -alpha);
-      chess.undo();
-      if (score > best) best = score;
-      if (score > alpha) alpha = score;
-      if (alpha >= beta) break;
-    }
-    return best;
-  }
-  let bestMove = null;
-  let bestScore = -Infinity;
-  const moves = chess.moves({ verbose: true });
-  for (const m of moves) {
-    chess.move(m);
-    const score = -negamax(maxDepth - 1, -Infinity, Infinity);
-    chess.undo();
-    if (score > bestScore) { bestScore = score; bestMove = m; }
-  }
-  if (!bestMove) return null;
-  const promo = bestMove.promotion ? bestMove.promotion : '';
-  return bestMove.from + bestMove.to + (promo || '');
+function eloToSkillLevel(elo) {
+  // Map ELO ratings to Stockfish skill levels (0-20)
+  const rating = Number(elo) || 1200;
+  if (rating <= 600) return 0;
+  if (rating >= 2400) return 20;
+
+  // Linear interpolation: 600->0, 2400->20
+  const skillLevel = Math.round(((rating - 600) / (2400 - 600)) * 20);
+  return Math.max(0, Math.min(20, skillLevel));
 }
 
 app.post('/api/stockfish/move', async (req, res) => {
