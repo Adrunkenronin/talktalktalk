@@ -5,6 +5,8 @@ const fs = require('fs');
 const WebSocket = require('ws');
 const sanitizeHtml = require('sanitize-html');
 const ChessCtor = require('chess.js').Chess;
+const { spawn } = require('child_process');
+const { EventEmitter } = require('events');
 
 // Config (mirrors config.py defaults)
 const HOST = '0.0.0.0';
@@ -117,8 +119,229 @@ function eloToDepth(elo) {
   return 8;
 }
 
-async function bestMoveWithStockfish(fen, depth) {
-  return null;
+class StockfishEngine extends EventEmitter {
+  constructor(enginePath) {
+    super();
+    this.enginePath = enginePath;
+    this.process = null;
+    this.ready = false;
+    this.queue = [];
+    this.currentSearch = null;
+  }
+
+  async start() {
+    return new Promise((resolve, reject) => {
+      try {
+        console.log('[stockfish] Starting engine:', this.enginePath);
+        this.process = spawn(this.enginePath, [], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 30000
+        });
+
+        let initialized = false;
+
+        this.process.stdout.on('data', (data) => {
+          const lines = data.toString().split('\n');
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+
+            console.log('[stockfish-out]', trimmed);
+
+            if (trimmed === 'uciok') {
+              this.ready = true;
+              if (!initialized) {
+                initialized = true;
+                resolve(this);
+              }
+            } else if (trimmed.startsWith('bestmove')) {
+              const parts = trimmed.split(' ');
+              const move = parts[1];
+              if (this.currentSearch) {
+                clearTimeout(this.currentSearch.timeout);
+                this.currentSearch.resolve(move);
+                this.currentSearch = null;
+              }
+            }
+          }
+        });
+
+        this.process.stderr.on('data', (data) => {
+          console.warn('[stockfish-err]', data.toString());
+        });
+
+        this.process.on('error', (err) => {
+          console.error('[stockfish] Process error:', err);
+          if (!initialized) reject(err);
+        });
+
+        // Send initialization command
+        this.process.stdin.write('uci\n');
+
+        // Timeout for initialization
+        setTimeout(() => {
+          if (!initialized) {
+            reject(new Error('Stockfish initialization timeout'));
+          }
+        }, 5000);
+
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  send(command) {
+    if (this.process && this.process.stdin) {
+      console.log('[stockfish-in]', command);
+      this.process.stdin.write(command + '\n');
+    }
+  }
+
+  async go(options) {
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        resolve(null);
+      }, 30000);
+
+      this.currentSearch = { resolve, timeout };
+
+      let goCommand = 'go';
+      if (options.depth) {
+        goCommand += ' depth ' + options.depth;
+      } else if (options.movetime) {
+        goCommand += ' movetime ' + options.movetime;
+      } else {
+        goCommand += ' depth 15';
+      }
+
+      this.send(goCommand);
+    });
+  }
+
+  async setoption(name, value) {
+    this.send(`setoption name ${name} value ${value}`);
+  }
+
+  async position(fen) {
+    this.send(`position fen ${fen}`);
+  }
+
+  async newgame() {
+    this.send('ucinewgame');
+  }
+
+  stop() {
+    if (this.process) {
+      this.process.kill();
+    }
+  }
+}
+
+let stockfishEngine = null;
+let stockfishInitPromise = null;
+
+async function initStockfish() {
+  if (stockfishEngine) {
+    console.log('[stockfish] Engine already initialized');
+    return stockfishEngine;
+  }
+
+  if (stockfishInitPromise) {
+    console.log('[stockfish] Waiting for initialization in progress');
+    return stockfishInitPromise;
+  }
+
+  stockfishInitPromise = (async () => {
+    try {
+      console.log('[stockfish] Initializing UCI engine...');
+
+      // Try common stockfish binary locations
+      const possiblePaths = [
+        'stockfish',                          // System PATH
+        '/usr/games/stockfish',              // Linux
+        '/usr/bin/stockfish',                // Linux alternative
+        '/usr/local/bin/stockfish',          // macOS homebrew
+        '/opt/homebrew/bin/stockfish',       // M1 macOS
+        'C:\\stockfish\\stockfish.exe',      // Windows
+        './stockfish',                        // Current directory
+      ];
+
+      let lastError = null;
+
+      for (const enginePath of possiblePaths) {
+        try {
+          console.log(`[stockfish] Trying: ${enginePath}`);
+          const engine = new StockfishEngine(enginePath);
+          await engine.start();
+          stockfishEngine = engine;
+          console.log('[stockfish] Engine initialized and ready');
+          return stockfishEngine;
+        } catch (err) {
+          lastError = err;
+          console.log(`[stockfish] Failed: ${err.message}`);
+        }
+      }
+
+      throw new Error(`Could not find stockfish binary. Last error: ${lastError ? lastError.message : 'unknown'}`);
+
+    } catch (err) {
+      console.error('[stockfish] Initialization error:', err.message);
+      stockfishInitPromise = null;
+      throw err;
+    }
+  })();
+
+  return stockfishInitPromise;
+}
+
+async function bestMoveWithStockfish(fen, depth, elo) {
+  try {
+    if (!stockfishEngine) {
+      try {
+        await initStockfish();
+      } catch (err) {
+        console.warn('[stockfish] Binary not available, using fallback algorithm');
+        return bestMoveFallback(fen, depth);
+      }
+    }
+
+    if (!stockfishEngine) {
+      console.warn('[stockfish] Engine unavailable, using fallback algorithm');
+      return bestMoveFallback(fen, depth);
+    }
+
+    await stockfishEngine.newgame();
+
+    // Set skill level based on ELO
+    if (elo && !isNaN(elo)) {
+      const skillLevel = eloToSkillLevel(elo);
+      console.log('[stockfish] Setting skill level to', skillLevel, 'for ELO', elo);
+      await stockfishEngine.setoption('Skill Level', skillLevel);
+    }
+
+    // Prepare position
+    await stockfishEngine.position(fen);
+
+    // Search with depth
+    const depthToUse = Math.max(1, Math.min(30, Number(depth) || 15));
+    console.log('[stockfish] Searching with depth', depthToUse);
+
+    const bestMove = await stockfishEngine.go({ depth: depthToUse });
+
+    if (bestMove) {
+      console.log('[stockfish] Best move:', bestMove);
+      return bestMove;
+    }
+
+    console.warn('[stockfish] No best move returned, using fallback');
+    return bestMoveFallback(fen, depth);
+
+  } catch (err) {
+    console.error('[stockfish] Error during search:', err);
+    console.log('[stockfish] Falling back to simple algorithm');
+    return bestMoveFallback(fen, depth);
+  }
 }
 
 function evaluateBoardMaterial(chess) {
@@ -138,15 +361,39 @@ function evaluateBoardMaterial(chess) {
 function bestMoveFallback(fen, depth) {
   const chess = new ChessCtor();
   try { chess.load(fen); } catch (_) { return null; }
-  const maxDepth = Math.max(1, Number(depth) || 5);
+
+  // Limit depth for fallback algorithm to avoid timeouts
+  // Fallback is much slower than real Stockfish
+  const requestedDepth = Number(depth) || 5;
+  const maxDepth = Math.max(1, Math.min(5, requestedDepth));
+
   const player = chess.turn();
+  const startTime = Date.now();
+  const timeLimit = 8000; // 8 seconds max to stay under 10s browser timeout
+  let nodeCount = 0;
+  const maxNodes = 500000; // Limit nodes to prevent timeout
+
   function negamax(d, alpha, beta) {
+    nodeCount++;
+
+    // Timeout check every 1000 nodes
+    if (nodeCount % 1000 === 0) {
+      if (Date.now() - startTime > timeLimit) {
+        return 0; // Return neutral eval if timeout
+      }
+      if (nodeCount > maxNodes) {
+        return 0;
+      }
+    }
+
     if (d === 0 || chess.game_over()) {
       const evalScore = evaluateBoardMaterial(chess);
       return player === 'w' ? evalScore : -evalScore;
     }
+
     let best = -Infinity;
     const moves = chess.moves({ verbose: true });
+
     for (const m of moves) {
       chess.move(m);
       const score = -negamax(d - 1, -beta, -alpha);
@@ -157,44 +404,87 @@ function bestMoveFallback(fen, depth) {
     }
     return best;
   }
+
   let bestMove = null;
   let bestScore = -Infinity;
   const moves = chess.moves({ verbose: true });
-  for (const m of moves) {
-    chess.move(m);
-    const score = -negamax(maxDepth - 1, -Infinity, Infinity);
-    chess.undo();
-    if (score > bestScore) { bestScore = score; bestMove = m; }
+
+  // If no moves, return null
+  if (moves.length === 0) return null;
+
+  // Try iterative deepening - search shallow first, then deeper if time allows
+  for (let searchDepth = 1; searchDepth <= maxDepth; searchDepth++) {
+    if (Date.now() - startTime > timeLimit) break;
+
+    bestMove = null;
+    bestScore = -Infinity;
+
+    for (const m of moves) {
+      if (Date.now() - startTime > timeLimit) break;
+
+      chess.move(m);
+      const score = -negamax(searchDepth - 1, -Infinity, Infinity);
+      chess.undo();
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestMove = m;
+      }
+    }
+
+    if (!bestMove) break;
   }
+
   if (!bestMove) return null;
   const promo = bestMove.promotion ? bestMove.promotion : '';
   return bestMove.from + bestMove.to + (promo || '');
+}
+
+function eloToSkillLevel(elo) {
+  // Map ELO ratings to Stockfish skill levels (0-20)
+  const rating = Number(elo) || 1200;
+  if (rating <= 600) return 0;
+  if (rating >= 2400) return 20;
+
+  // Linear interpolation: 600->0, 2400->20
+  const skillLevel = Math.round(((rating - 600) / (2400 - 600)) * 20);
+  return Math.max(0, Math.min(20, skillLevel));
 }
 
 app.post('/api/stockfish/move', async (req, res) => {
   const fen = String(req.body && req.body.fen || '').trim();
   let depth = Number(req.body && (req.body.depth ?? 0));
   const elo = Number(req.body && (req.body.elo ?? 0));
+
   if (!fen) return res.status(400).json({ error: 'fen required' });
   if (!depth && elo) depth = eloToDepth(elo);
-  if (!depth) depth = 8;
+  if (!depth) depth = 12;
 
-  // Diagnostic logging to help debug Network/engine issues
   try {
     console.log('[stockfish] request', {
       time: new Date().toISOString(),
       ip: req.ip,
-      forwarded: req.headers['x-forwarded-for'] || null,
-      body: req.body
+      fen: fen,
+      depth: depth,
+      elo: elo
     });
   } catch (_) {}
 
   try {
-    const best = bestMoveFallback(fen, depth);
+    // Wrap with timeout to ensure we respond before browser timeout (10s)
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Engine search timeout')), 9000)
+    );
+
+    const searchPromise = bestMoveWithStockfish(fen, depth, elo);
+
+    const best = await Promise.race([searchPromise, timeoutPromise]);
+
     if (!best) {
       console.warn('[stockfish] no_move for fen', fen);
       return res.status(422).json({ error: 'no_move' });
     }
+    console.log('[stockfish] bestmove:', best);
     return res.json({ bestmove: best });
   } catch (e) {
     console.error('[stockfish] engine error', e && e.stack ? e.stack : e);
