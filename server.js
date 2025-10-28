@@ -298,12 +298,17 @@ async function initStockfish() {
 async function bestMoveWithStockfish(fen, depth, elo) {
   try {
     if (!stockfishEngine) {
-      await initStockfish();
+      try {
+        await initStockfish();
+      } catch (err) {
+        console.warn('[stockfish] Binary not available, using fallback algorithm');
+        return bestMoveFallback(fen, depth);
+      }
     }
 
     if (!stockfishEngine) {
-      console.error('[stockfish] Engine initialization failed');
-      return null;
+      console.warn('[stockfish] Engine unavailable, using fallback algorithm');
+      return bestMoveFallback(fen, depth);
     }
 
     await stockfishEngine.newgame();
@@ -329,13 +334,68 @@ async function bestMoveWithStockfish(fen, depth, elo) {
       return bestMove;
     }
 
-    console.warn('[stockfish] No best move returned');
-    return null;
+    console.warn('[stockfish] No best move returned, using fallback');
+    return bestMoveFallback(fen, depth);
 
   } catch (err) {
     console.error('[stockfish] Error during search:', err);
-    return null;
+    console.log('[stockfish] Falling back to simple algorithm');
+    return bestMoveFallback(fen, depth);
   }
+}
+
+function evaluateBoardMaterial(chess) {
+  const values = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 0 };
+  const board = chess.board();
+  let score = 0;
+  for (const row of board) {
+    for (const piece of row) {
+      if (!piece) continue;
+      const v = values[piece.type] || 0;
+      score += (piece.color === 'w') ? v : -v;
+    }
+  }
+  return score;
+}
+
+function bestMoveFallback(fen, depth) {
+  const chess = new ChessCtor();
+  try { chess.load(fen); } catch (_) { return null; }
+  const maxDepth = Math.max(1, Number(depth) || 5);
+  const player = chess.turn();
+
+  function negamax(d, alpha, beta) {
+    if (d === 0 || chess.game_over()) {
+      const evalScore = evaluateBoardMaterial(chess);
+      return player === 'w' ? evalScore : -evalScore;
+    }
+    let best = -Infinity;
+    const moves = chess.moves({ verbose: true });
+    for (const m of moves) {
+      chess.move(m);
+      const score = -negamax(d - 1, -beta, -alpha);
+      chess.undo();
+      if (score > best) best = score;
+      if (score > alpha) alpha = score;
+      if (alpha >= beta) break;
+    }
+    return best;
+  }
+
+  let bestMove = null;
+  let bestScore = -Infinity;
+  const moves = chess.moves({ verbose: true });
+
+  for (const m of moves) {
+    chess.move(m);
+    const score = -negamax(maxDepth - 1, -Infinity, Infinity);
+    chess.undo();
+    if (score > bestScore) { bestScore = score; bestMove = m; }
+  }
+
+  if (!bestMove) return null;
+  const promo = bestMove.promotion ? bestMove.promotion : '';
+  return bestMove.from + bestMove.to + (promo || '');
 }
 
 function eloToSkillLevel(elo) {
