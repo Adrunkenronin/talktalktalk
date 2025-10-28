@@ -119,13 +119,10 @@ function eloToDepth(elo) {
 }
 
 let stockfishEngine = null;
-let stockfishReady = false;
-let stockfishInitError = null;
 let stockfishInitPromise = null;
-const pendingSearches = new Map(); // searchId -> {resolve, timeout}
 
 async function initStockfish() {
-  if (stockfishEngine && stockfishReady) {
+  if (stockfishEngine) {
     console.log('[stockfish] Engine already initialized');
     return stockfishEngine;
   }
@@ -135,124 +132,91 @@ async function initStockfish() {
     return stockfishInitPromise;
   }
 
-  stockfishInitPromise = new Promise((resolve, reject) => {
+  stockfishInitPromise = (async () => {
     try {
-      console.log('[stockfish] Initializing engine...');
+      console.log('[stockfish] Initializing UCI engine...');
 
-      // Stockfish is a function that returns an object with postMessage/onmessage
-      if (typeof Stockfish === 'function') {
-        console.log('[stockfish] Using Stockfish as function');
-        stockfishEngine = Stockfish();
-      } else {
-        console.log('[stockfish] Using Stockfish as constructor');
-        stockfishEngine = new Stockfish();
-      }
+      // Try common stockfish binary locations
+      const possiblePaths = [
+        'stockfish',                          // System PATH
+        '/usr/games/stockfish',              // Linux
+        '/usr/local/bin/stockfish',          // macOS homebrew
+        'C:\\stockfish\\stockfish.exe',      // Windows
+        './stockfish',                        // Current directory
+      ];
 
-      if (!stockfishEngine) {
-        throw new Error('Stockfish initialization returned null');
-      }
+      let engine = null;
+      let lastError = null;
 
-      console.log('[stockfish] Engine created, setting up message handler');
-
-      stockfishEngine.onmessage = function(event) {
-        const line = typeof event === 'string' ? event : (event && event.data);
-        if (!line) return;
-
-        console.log('[stockfish-out]', line);
-
-        if (line === 'uciok') {
-          stockfishReady = true;
-          console.log('[stockfish] Engine initialized and ready');
-          resolve(stockfishEngine);
-        } else if (line === 'readyok') {
-          console.log('[stockfish] Engine confirmed ready');
-        } else if (line.startsWith('bestmove')) {
-          const parts = line.split(' ');
-          const move = parts[1];
-          const searchId = 'search_default';
-
-          console.log('[stockfish] Received bestmove:', move);
-
-          if (pendingSearches.has(searchId)) {
-            const pending = pendingSearches.get(searchId);
-            clearTimeout(pending.timeout);
-            pending.resolve(move);
-            pendingSearches.delete(searchId);
-          }
+      for (const enginePath of possiblePaths) {
+        try {
+          console.log(`[stockfish] Trying to start engine from: ${enginePath}`);
+          engine = new Engine(enginePath);
+          console.log(`[stockfish] Successfully started engine from: ${enginePath}`);
+          break;
+        } catch (err) {
+          lastError = err;
+          console.log(`[stockfish] Failed to start from ${enginePath}: ${err.message}`);
+          continue;
         }
-      };
-
-      if (!stockfishEngine.postMessage) {
-        throw new Error('Stockfish engine does not have postMessage method');
       }
 
-      console.log('[stockfish] Sending UCI command');
-      stockfishEngine.postMessage('uci');
+      if (!engine) {
+        throw new Error(`Could not find stockfish binary. Last error: ${lastError ? lastError.message : 'unknown'}`);
+      }
 
-      // Set a timeout in case the engine doesn't respond
-      const initTimeout = setTimeout(() => {
-        if (!stockfishReady) {
-          stockfishInitError = 'Stockfish initialization timeout';
-          reject(new Error(stockfishInitError));
-        }
-      }, 5000);
+      stockfishEngine = engine;
+      console.log('[stockfish] Engine initialized and ready');
+      return stockfishEngine;
 
     } catch (err) {
       console.error('[stockfish] Initialization error:', err);
-      stockfishInitError = err.message;
-      reject(err);
+      throw err;
     }
-  });
+  })();
 
-  try {
-    await stockfishInitPromise;
-    return stockfishEngine;
-  } catch (err) {
-    stockfishInitPromise = null;
-    throw err;
-  }
+  return stockfishInitPromise;
 }
 
 async function bestMoveWithStockfish(fen, depth, elo) {
-  if (!stockfishEngine) {
-    try {
+  try {
+    if (!stockfishEngine) {
       await initStockfish();
-    } catch (err) {
-      console.error('[stockfish] Failed to initialize engine:', err);
+    }
+
+    if (!stockfishEngine) {
+      console.error('[stockfish] Engine is null after initialization');
       return null;
     }
-  }
 
-  return new Promise((resolve) => {
-    try {
-      const searchId = 'search_default';
-      const timeout = setTimeout(() => {
-        if (pendingSearches.has(searchId)) {
-          pendingSearches.delete(searchId);
-        }
-        resolve(null);
-      }, 30000); // 30 second timeout
-
-      pendingSearches.set(searchId, { resolve, timeout });
-
-      // Send position and search command
-      stockfishEngine.postMessage(`position fen ${fen}`);
-
-      // If ELO is specified, set the skill level
-      if (elo && !isNaN(elo)) {
-        const skillLevel = eloToSkillLevel(elo);
-        stockfishEngine.postMessage(`setoption name Skill Level value ${skillLevel}`);
-      }
-
-      // Send go command with depth
-      const depthToUse = Math.max(1, Math.min(30, Number(depth) || 15));
-      stockfishEngine.postMessage(`go depth ${depthToUse}`);
-
-    } catch (err) {
-      console.error('[stockfish] Error during search:', err);
-      resolve(null);
+    // Set skill level based on ELO
+    if (elo && !isNaN(elo)) {
+      const skillLevel = eloToSkillLevel(elo);
+      console.log('[stockfish] Setting skill level to', skillLevel, 'for ELO', elo);
+      await stockfishEngine.setoption('Skill Level', skillLevel);
     }
-  });
+
+    // Prepare position
+    await stockfishEngine.position(fen);
+
+    // Search with depth
+    const depthToUse = Math.max(1, Math.min(30, Number(depth) || 15));
+    console.log('[stockfish] Searching with depth', depthToUse);
+
+    const result = await stockfishEngine.go({ depth: depthToUse });
+
+    if (result && result.bestmove) {
+      console.log('[stockfish] Best move:', result.bestmove);
+      return result.bestmove;
+    }
+
+    console.warn('[stockfish] No best move returned');
+    return null;
+
+  } catch (err) {
+    console.error('[stockfish] Error during search:', err);
+    return null;
+  }
 }
 
 function eloToSkillLevel(elo) {
