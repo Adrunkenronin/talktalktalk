@@ -119,24 +119,35 @@ function eloToDepth(elo) {
 }
 
 let stockfishEngine = null;
-const stockfishMessageQueue = [];
 let stockfishReady = false;
-const pendingSearches = new Map(); // searchId -> {resolve, reject, timeout}
+const pendingSearches = new Map(); // searchId -> {resolve, timeout}
 
 async function initStockfish() {
-  if (stockfishEngine) return stockfishEngine;
+  if (stockfishEngine && stockfishReady) return stockfishEngine;
+  if (stockfishEngine) {
+    // Already initializing, wait for readiness
+    return new Promise((resolve) => {
+      const checkReady = setInterval(() => {
+        if (stockfishReady) {
+          clearInterval(checkReady);
+          resolve(stockfishEngine);
+        }
+      }, 100);
+    });
+  }
 
   return new Promise((resolve, reject) => {
     try {
-      stockfishEngine = new (Stockfish)();
-      let uciOkReceived = false;
+      // Stockfish is a function that returns an object with postMessage/onmessage
+      stockfishEngine = typeof Stockfish === 'function' ? Stockfish() : new Stockfish();
 
       stockfishEngine.onmessage = function(event) {
-        const line = event.data;
+        const line = typeof event === 'string' ? event : (event && event.data);
+        if (!line) return;
+
         console.log('[stockfish-out]', line);
 
         if (line === 'uciok') {
-          uciOkReceived = true;
           stockfishReady = true;
           console.log('[stockfish] Engine initialized and ready');
           resolve(stockfishEngine);
@@ -157,9 +168,14 @@ async function initStockfish() {
         }
       };
 
-      // Send init commands
-      stockfishEngine.postMessage('uci');
+      // Send init command
+      if (stockfishEngine.postMessage) {
+        stockfishEngine.postMessage('uci');
+      } else {
+        reject(new Error('Stockfish engine does not have postMessage method'));
+      }
     } catch (err) {
+      console.error('[stockfish] Initialization error:', err);
       reject(err);
     }
   });
