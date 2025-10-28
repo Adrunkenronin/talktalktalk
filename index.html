@@ -1826,11 +1826,6 @@ function ready() {
         }
     });
 
-    $('#stockfish-play-btn').on('click', function() {
-        var playerColor = $('input[name="stockfish-color"]:checked').val();
-        var elo = parseInt($('#stockfish-difficulty').val());
-        startStockfishGame(playerColor, elo);
-    });
 
     $('#chess-board')
         .on('click', '.chess-square', onSquareClick)
