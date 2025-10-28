@@ -361,16 +361,39 @@ function evaluateBoardMaterial(chess) {
 function bestMoveFallback(fen, depth) {
   const chess = new ChessCtor();
   try { chess.load(fen); } catch (_) { return null; }
-  const maxDepth = Math.max(1, Number(depth) || 5);
+
+  // Limit depth for fallback algorithm to avoid timeouts
+  // Fallback is much slower than real Stockfish
+  const requestedDepth = Number(depth) || 5;
+  const maxDepth = Math.max(1, Math.min(5, requestedDepth));
+
   const player = chess.turn();
+  const startTime = Date.now();
+  const timeLimit = 8000; // 8 seconds max to stay under 10s browser timeout
+  let nodeCount = 0;
+  const maxNodes = 500000; // Limit nodes to prevent timeout
 
   function negamax(d, alpha, beta) {
+    nodeCount++;
+
+    // Timeout check every 1000 nodes
+    if (nodeCount % 1000 === 0) {
+      if (Date.now() - startTime > timeLimit) {
+        return 0; // Return neutral eval if timeout
+      }
+      if (nodeCount > maxNodes) {
+        return 0;
+      }
+    }
+
     if (d === 0 || chess.game_over()) {
       const evalScore = evaluateBoardMaterial(chess);
       return player === 'w' ? evalScore : -evalScore;
     }
+
     let best = -Infinity;
     const moves = chess.moves({ verbose: true });
+
     for (const m of moves) {
       chess.move(m);
       const score = -negamax(d - 1, -beta, -alpha);
@@ -386,11 +409,30 @@ function bestMoveFallback(fen, depth) {
   let bestScore = -Infinity;
   const moves = chess.moves({ verbose: true });
 
-  for (const m of moves) {
-    chess.move(m);
-    const score = -negamax(maxDepth - 1, -Infinity, Infinity);
-    chess.undo();
-    if (score > bestScore) { bestScore = score; bestMove = m; }
+  // If no moves, return null
+  if (moves.length === 0) return null;
+
+  // Try iterative deepening - search shallow first, then deeper if time allows
+  for (let searchDepth = 1; searchDepth <= maxDepth; searchDepth++) {
+    if (Date.now() - startTime > timeLimit) break;
+
+    bestMove = null;
+    bestScore = -Infinity;
+
+    for (const m of moves) {
+      if (Date.now() - startTime > timeLimit) break;
+
+      chess.move(m);
+      const score = -negamax(searchDepth - 1, -Infinity, Infinity);
+      chess.undo();
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestMove = m;
+      }
+    }
+
+    if (!bestMove) break;
   }
 
   if (!bestMove) return null;
