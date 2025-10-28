@@ -222,26 +222,28 @@ app.post('/api/stockfish/move', async (req, res) => {
   const fen = String(req.body && req.body.fen || '').trim();
   let depth = Number(req.body && (req.body.depth ?? 0));
   const elo = Number(req.body && (req.body.elo ?? 0));
+
   if (!fen) return res.status(400).json({ error: 'fen required' });
   if (!depth && elo) depth = eloToDepth(elo);
-  if (!depth) depth = 8;
+  if (!depth) depth = 15;
 
-  // Diagnostic logging to help debug Network/engine issues
   try {
     console.log('[stockfish] request', {
       time: new Date().toISOString(),
       ip: req.ip,
-      forwarded: req.headers['x-forwarded-for'] || null,
-      body: req.body
+      fen: fen,
+      depth: depth,
+      elo: elo
     });
   } catch (_) {}
 
   try {
-    const best = bestMoveFallback(fen, depth);
+    const best = await bestMoveWithStockfish(fen, depth, elo);
     if (!best) {
       console.warn('[stockfish] no_move for fen', fen);
       return res.status(422).json({ error: 'no_move' });
     }
+    console.log('[stockfish] bestmove:', best);
     return res.json({ bestmove: best });
   } catch (e) {
     console.error('[stockfish] engine error', e && e.stack ? e.stack : e);
