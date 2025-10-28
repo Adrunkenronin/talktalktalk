@@ -120,26 +120,39 @@ function eloToDepth(elo) {
 
 let stockfishEngine = null;
 let stockfishReady = false;
+let stockfishInitError = null;
+let stockfishInitPromise = null;
 const pendingSearches = new Map(); // searchId -> {resolve, timeout}
 
 async function initStockfish() {
-  if (stockfishEngine && stockfishReady) return stockfishEngine;
-  if (stockfishEngine) {
-    // Already initializing, wait for readiness
-    return new Promise((resolve) => {
-      const checkReady = setInterval(() => {
-        if (stockfishReady) {
-          clearInterval(checkReady);
-          resolve(stockfishEngine);
-        }
-      }, 100);
-    });
+  if (stockfishEngine && stockfishReady) {
+    console.log('[stockfish] Engine already initialized');
+    return stockfishEngine;
   }
 
-  return new Promise((resolve, reject) => {
+  if (stockfishInitPromise) {
+    console.log('[stockfish] Waiting for initialization in progress');
+    return stockfishInitPromise;
+  }
+
+  stockfishInitPromise = new Promise((resolve, reject) => {
     try {
+      console.log('[stockfish] Initializing engine...');
+
       // Stockfish is a function that returns an object with postMessage/onmessage
-      stockfishEngine = typeof Stockfish === 'function' ? Stockfish() : new Stockfish();
+      if (typeof Stockfish === 'function') {
+        console.log('[stockfish] Using Stockfish as function');
+        stockfishEngine = Stockfish();
+      } else {
+        console.log('[stockfish] Using Stockfish as constructor');
+        stockfishEngine = new Stockfish();
+      }
+
+      if (!stockfishEngine) {
+        throw new Error('Stockfish initialization returned null');
+      }
+
+      console.log('[stockfish] Engine created, setting up message handler');
 
       stockfishEngine.onmessage = function(event) {
         const line = typeof event === 'string' ? event : (event && event.data);
@@ -152,12 +165,13 @@ async function initStockfish() {
           console.log('[stockfish] Engine initialized and ready');
           resolve(stockfishEngine);
         } else if (line === 'readyok') {
-          // engine is ready for next command
+          console.log('[stockfish] Engine confirmed ready');
         } else if (line.startsWith('bestmove')) {
-          // Parse: bestmove e2e4 ponder e7e5
           const parts = line.split(' ');
-          const move = parts[1]; // e.g., "e2e4"
+          const move = parts[1];
           const searchId = 'search_default';
+
+          console.log('[stockfish] Received bestmove:', move);
 
           if (pendingSearches.has(searchId)) {
             const pending = pendingSearches.get(searchId);
@@ -168,17 +182,35 @@ async function initStockfish() {
         }
       };
 
-      // Send init command
-      if (stockfishEngine.postMessage) {
-        stockfishEngine.postMessage('uci');
-      } else {
-        reject(new Error('Stockfish engine does not have postMessage method'));
+      if (!stockfishEngine.postMessage) {
+        throw new Error('Stockfish engine does not have postMessage method');
       }
+
+      console.log('[stockfish] Sending UCI command');
+      stockfishEngine.postMessage('uci');
+
+      // Set a timeout in case the engine doesn't respond
+      const initTimeout = setTimeout(() => {
+        if (!stockfishReady) {
+          stockfishInitError = 'Stockfish initialization timeout';
+          reject(new Error(stockfishInitError));
+        }
+      }, 5000);
+
     } catch (err) {
       console.error('[stockfish] Initialization error:', err);
+      stockfishInitError = err.message;
       reject(err);
     }
   });
+
+  try {
+    await stockfishInitPromise;
+    return stockfishEngine;
+  } catch (err) {
+    stockfishInitPromise = null;
+    throw err;
+  }
 }
 
 async function bestMoveWithStockfish(fen, depth, elo) {
