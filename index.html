@@ -1329,10 +1329,15 @@ function ready() {
             ws.send(JSON.stringify({ "type" : "username", "username" : $('#username').text() }));
             setTimeout(function(){
                 try {
-                    var ag = localStorage.getItem('active_game');
+                    var me = $('#username').text() || getStoredUsername() || '';
+                    var ag = null;
+                    if (me) ag = localStorage.getItem('active_game_' + me);
+                    if (!ag) { try { ag = localStorage.getItem('active_game'); } catch(_e){} }
                     if (ag) {
                         var obj = JSON.parse(ag);
-                        ws.send(JSON.stringify({ type: 'chess_resume_request', game_id: obj.id }));
+                        if (!me || obj.white === me || obj.black === me) {
+                            ws.send(JSON.stringify({ type: 'chess_resume_request', game_id: obj.id }));
+                        }
                     }
                 } catch(e){}
             }, 150);
@@ -1602,7 +1607,11 @@ function ready() {
             chessGame = null;
         } else if (chessGame && !chessGame.over) {
             showRejoinPrompt();
-            try { localStorage.setItem('active_game', JSON.stringify({ id: chessGame.id, white: chessGame.white, black: chessGame.black })); } catch(e){}
+            try {
+                var me = $('#username').text() || getStoredUsername() || '';
+                if (me) localStorage.setItem('active_game_' + me, JSON.stringify({ id: chessGame.id, white: chessGame.white, black: chessGame.black }));
+                else localStorage.setItem('active_game', JSON.stringify({ id: chessGame.id, white: chessGame.white, black: chessGame.black }));
+            } catch(e){}
         }
     });
     $('#chess-confirm-move').on('click', function(){
@@ -1876,14 +1885,22 @@ function ready() {
                 lastMove: null,
                 over: false
             };
-            try { localStorage.setItem('active_game', JSON.stringify({ id: chessGame.id, white: chessGame.white, black: chessGame.black })); } catch(e){}
+            try {
+                var me = $('#username').text() || getStoredUsername() || '';
+                if (me) localStorage.setItem('active_game_' + me, JSON.stringify({ id: chessGame.id, white: chessGame.white, black: chessGame.black }));
+                else localStorage.setItem('active_game', JSON.stringify({ id: chessGame.id, white: chessGame.white, black: chessGame.black }));
+            } catch(e){}
             $('#chess-white').text(chessGame.white);
             $('#chess-black').text(chessGame.black);
             pendingUserMove = null; premoveQueue = []; updateConfirmButton();
             showRejoinPrompt();
         }
         else if (data['type'] === 'chess_start') {
-            try { localStorage.setItem('active_game', JSON.stringify({ id: data['game_id'], white: data['white'], black: data['black'] })); } catch(e){}
+            try {
+                var me2 = $('#username').text() || getStoredUsername() || '';
+                if (me2) localStorage.setItem('active_game_' + me2, JSON.stringify({ id: data['game_id'], white: data['white'], black: data['black'] }));
+                else localStorage.setItem('active_game', JSON.stringify({ id: data['game_id'], white: data['white'], black: data['black'] }));
+            } catch(e){}
             startChessGame(data);
         }
         else if (data['type'] === 'chess_move') {
@@ -1905,7 +1922,11 @@ function ready() {
             }
         }
         else if (data['type'] === 'chess_over') {
-            try { localStorage.removeItem('active_game'); } catch(e){}
+            try {
+                var me = $('#username').text() || getStoredUsername() || '';
+                if (me) localStorage.removeItem('active_game_' + me);
+                try { localStorage.removeItem('active_game'); } catch(_){}
+            } catch(e){}
             if (chessGame && chessGame.id === data['game_id']) {
                 chessGame.over = true;
                 $('#chess-status').text('Game over: ' + data['result'] + ' (' + data['reason'] + ')');
