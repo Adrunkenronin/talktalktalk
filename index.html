@@ -1700,11 +1700,32 @@ function ready() {
 
     // Rejoin button handler (delegated)
     $('#invites').on('click', '#rejoin-game', function(){
-        if (chessGame && !chessGame.over) {
-            $('#chess-modal').removeClass('hidden');
-            __chessUnread = 0; __updateTitleBadge();
-            renderBoard();
-            updateChessStatus();
+        try {
+            if (chessGame && !chessGame.over) {
+                $('#chess-modal').removeClass('hidden');
+                __chessUnread = 0; __updateTitleBadge();
+                renderBoard();
+                updateChessStatus();
+                return;
+            }
+            var ag = null;
+            try { ag = localStorage.getItem('active_game'); } catch(e) { ag = null; }
+            if (ag) {
+                var obj = JSON.parse(ag);
+                if (ws && ws.readyState === 1) {
+                    ws.send(JSON.stringify({ type: 'chess_resume_request', game_id: obj.id }));
+                    $('#chess-modal').removeClass('hidden');
+                    $('#chess-status').text('Rejoining game...');
+                    flashStatus('Attempting to rejoin game...');
+                } else {
+                    flashStatus('Not connected — will try to rejoin when connected.');
+                }
+            } else {
+                flashStatus('No saved game to rejoin');
+            }
+        } catch(e) {
+            console.error('Rejoin handler error', e);
+            flashStatus('Failed to rejoin');
         }
     });
 
