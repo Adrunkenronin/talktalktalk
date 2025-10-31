@@ -1717,16 +1717,25 @@ function ready() {
                 return;
             }
             var ag = null;
-            try { ag = localStorage.getItem('active_game'); } catch(e) { ag = null; }
+            try {
+                var me = $('#username').text() || getStoredUsername() || '';
+                if (me) ag = localStorage.getItem('active_game_' + me);
+                if (!ag) { try { ag = localStorage.getItem('active_game'); } catch(_e){} }
+            } catch(e) { ag = null; }
             if (ag) {
                 var obj = JSON.parse(ag);
-                if (ws && ws.readyState === 1) {
-                    ws.send(JSON.stringify({ type: 'chess_resume_request', game_id: obj.id }));
-                    $('#chess-modal').removeClass('hidden');
-                    $('#chess-status').text('Rejoining game...');
-                    flashStatus('Attempting to rejoin game...');
+                var me2 = $('#username').text() || getStoredUsername() || '';
+                if (!me2 || obj.white === me2 || obj.black === me2) {
+                    if (ws && ws.readyState === 1) {
+                        ws.send(JSON.stringify({ type: 'chess_resume_request', game_id: obj.id }));
+                        $('#chess-modal').removeClass('hidden');
+                        $('#chess-status').text('Rejoining game...');
+                        flashStatus('Attempting to rejoin game...');
+                    } else {
+                        flashStatus('Not connected — will try to rejoin when connected.');
+                    }
                 } else {
-                    flashStatus('Not connected — will try to rejoin when connected.');
+                    flashStatus('No saved game for current user');
                 }
             } else {
                 flashStatus('No saved game to rejoin');
