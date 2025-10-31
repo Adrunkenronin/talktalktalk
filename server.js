@@ -690,6 +690,21 @@ wss.on('connection', (ws, req) => {
       const idafter = Number(msg.id) || 0;
       send(ws, { type: 'messages', before: 0, messages: messagesRange(idafter, idx) });
     }
+    else if (msg.type === 'clear_history') {
+      const username = users.get(ws);
+      if (!username || username !== ADMINNAME) {
+        send(ws, { type: 'chess_error', message: 'permission_denied' });
+      } else {
+        // clear in-memory messages and reset index
+        messages = [];
+        idx = 0;
+        try { fs.writeFileSync(MSG_FILE, ''); } catch (_) {}
+        // notify all connected clients to clear their UI
+        for (const w of wss.clients) {
+          if (w.readyState === WebSocket.OPEN) send(w, { type: 'cleared', by: username });
+        }
+      }
+    }
     else if (msg.type === 'username') {
       const oldName = users.get(ws) || null;
       const username = cleanUsername(msg.username, ws);

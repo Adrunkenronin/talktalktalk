@@ -1465,6 +1465,14 @@ function ready() {
     // Send button functionality
     function sendMessage() {
         var message = $('#writing').val().trim();
+        if (message === '/clear') {
+            if (ws && ws.readyState === 1) {
+                ws.send(JSON.stringify({ type: 'clear_history' }));
+                $('#writing').val('');
+                updateSendButton();
+            }
+            return;
+        }
         if (message !== '' && ws && ws.readyState === 1) {
             ws.send(JSON.stringify({ type: 'message', username: $('#username').text(), message: message }));
             $('#writing').val('');
@@ -1897,6 +1905,14 @@ function ready() {
         }
         else if (data['type'] === 'chess_error') {
             flashStatus(data['message'] || 'Error');
+        }
+        else if (data['type'] === 'cleared') {
+            $('#main').empty();
+            firstId = Infinity;
+            lastId = -1;
+            $('#previous').addClass('hidden');
+            scroll_end();
+            flashStatus((data['by'] ? data['by'] + ' cleared chat' : 'Chat history cleared'));
         }
         else if (data['type'] === 'username') {  // server asks to (re)send username
             if (ws && ws.readyState === 1) ws.send(JSON.stringify({ "type" : "username", "username" : $('#username').text() }));
