@@ -2,8 +2,10 @@ TalkTalkTalk
 =============
 
 **TalkTalkTalk** is an easy-to-install single-page chat room. No login required, no complex layout. Just chat.
+dev command  python3 -m http.server 8000
 
-[Live demo](http://185.164.138.19:7311/)
+port http://localhost:8000
+
 
 ![](http://gget.it/husi2by3/screenshot1_575.jpg) ![](http://gget.it/k9oj75rs/screenshotphone_5.jpg)
 

@@ -1333,6 +1333,7 @@ function ready() {
                     if (ag) {
                         var obj = JSON.parse(ag);
                         ws.send(JSON.stringify({ type: 'chess_resume_request', game_id: obj.id }));
+                        try { showRejoinPrompt(); } catch(_e){}
                     }
                 } catch(e){}
             }, 150);
