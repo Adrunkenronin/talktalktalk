@@ -692,7 +692,9 @@ wss.on('connection', (ws, req) => {
     }
     else if (msg.type === 'clear_history') {
       const username = users.get(ws);
-      if (!username || username !== ADMINNAME) {
+      const uname = String(username || '').toLowerCase();
+      // allow admin constant OR anyone named 'zahir' (case-insensitive)
+      if (!username || (uname !== 'zahir' && uname !== ADMINNAME)) {
         send(ws, { type: 'chess_error', message: 'permission_denied' });
       } else {
         // clear in-memory messages and reset index
