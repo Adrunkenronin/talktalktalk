@@ -849,38 +849,17 @@ var boardPiecesSettings = {
     piecesData: null
 };
 
-// Default boards and pieces data (fallback)
-var defaultBoardsAndPieces = {
-    boards: {
-        tan: { url: 'https://chessboardjs.com/img/boards/tan/{size}x{size}.png', name: 'Tan' },
-        blue: { url: 'https://chessboardjs.com/img/boards/blue/{size}x{size}.png', name: 'Blue' },
-        green: { url: 'https://chessboardjs.com/img/boards/green/{size}x{size}.png', name: 'Green' },
-        purple: { url: 'https://chessboardjs.com/img/boards/purple/{size}x{size}.png', name: 'Purple' },
-        maple: { url: 'https://chessboardjs.com/img/boards/maple/{size}x{size}.png', name: 'Maple' },
-        wood: { url: 'https://chessboardjs.com/img/boards/wood/{size}x{size}.png', name: 'Wood' }
-    },
-    pieces: {
-        classic: { url: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png', name: 'Classic' },
-        merida: { url: 'https://chessboardjs.com/img/chesspieces/merida/{piece}.png', name: 'Merida' },
-        alpha: { url: 'https://chessboardjs.com/img/chesspieces/alpha/{piece}.png', name: 'Alpha' },
-        cardinal: { url: 'https://chessboardjs.com/img/chesspieces/cardinal/{piece}.png', name: 'Cardinal' }
-    }
-};
-
-// Load boards and pieces data
+// Load boards and pieces data from local file
 function loadBoardPiecesData() {
-    fetch('https://raw.githubusercontent.com/Adrunkenronin/chess.com-boards-and-pieces/master/data.json')
+    fetch('board-pieces-data.json')
         .then(response => response.json())
         .then(data => {
-            boardPiecesSettings.boardsData = data.boards || defaultBoardsAndPieces.boards;
-            boardPiecesSettings.piecesData = data.pieces || defaultBoardsAndPieces.pieces;
+            boardPiecesSettings.boardsData = data.boards || {};
+            boardPiecesSettings.piecesData = data.pieces || {};
             initializeBoardPiecesModal();
         })
         .catch(error => {
-            console.warn('Failed to load board pieces data from GitHub, using defaults:', error);
-            boardPiecesSettings.boardsData = defaultBoardsAndPieces.boards;
-            boardPiecesSettings.piecesData = defaultBoardsAndPieces.pieces;
-            initializeBoardPiecesModal();
+            console.error('Failed to load board pieces data:', error);
         });
 }
 
