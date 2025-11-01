@@ -1627,9 +1627,64 @@ function ready() {
     // Sidebar toggle (mobile)
     $('#sidebar-toggle').on('click', function(){ $('#right').toggleClass('open'); });
 
+    // Chess settings dropdown toggle
+    $('#chess-settings-btn').on('click', function(e) {
+        e.stopPropagation();
+        $('#chess-settings-dropdown').toggleClass('hidden');
+    });
+
+    // Close settings dropdown when clicking outside
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('#chess-settings-btn, #chess-settings-dropdown').length) {
+            $('#chess-settings-dropdown').addClass('hidden');
+        }
+    });
+
+    // Chess settings toggle buttons
+    $('#chess-settings-dropdown').on('click', '.chess-settings-toggle', function(e) {
+        e.preventDefault();
+        var setting = $(this).data('setting');
+        if (setting === 'confirm-moves') {
+            chessSettings.confirmMoves = !chessSettings.confirmMoves;
+            updateSettingUI('confirm-moves');
+            if (!chessSettings.confirmMoves && pendingUserMove) {
+                clearPendingMove();
+            }
+        } else if (setting === 'premove') {
+            chessSettings.premoveEnabled = !chessSettings.premoveEnabled;
+            updateSettingUI('premove');
+            if (!chessSettings.premoveEnabled) {
+                clearAllPremoves();
+            }
+        }
+    });
+
+    function updateSettingUI(setting) {
+        var $toggle = $('#chess-settings-dropdown').find('[data-setting="' + setting + '"]');
+        var $icon = $toggle.find('i');
+        if (setting === 'confirm-moves') {
+            if (chessSettings.confirmMoves) {
+                $icon.removeClass('fa-toggle-off').addClass('fa-toggle-on');
+                $toggle.removeClass('disabled');
+            } else {
+                $icon.removeClass('fa-toggle-on').addClass('fa-toggle-off');
+                $toggle.addClass('disabled');
+            }
+        } else if (setting === 'premove') {
+            if (chessSettings.premoveEnabled) {
+                $icon.removeClass('fa-toggle-off').addClass('fa-toggle-on');
+                $toggle.removeClass('disabled');
+            } else {
+                $icon.removeClass('fa-toggle-on').addClass('fa-toggle-off');
+                $toggle.addClass('disabled');
+            }
+        }
+    }
+
     // Chess modal controls
     $('#chess-close').on('click', function(){
         $('#chess-modal').addClass('hidden');
+        $('#chess-settings-dropdown').addClass('hidden');
         if (stockfishGame) {
             stockfishGame = null;
             chessGame = null;
