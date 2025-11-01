@@ -903,7 +903,7 @@ function initializeBoardPiecesModal() {
         }
 
         const previewUrl = typeof boardUrl === 'object' ? boardUrl.url : boardUrl;
-        const imageSrc = previewUrl.replace('{size}', '140').replace('{}', '140');
+        const imageSrc = previewUrl.replace(/{size}/g, '140');
         const displayName = boardName.replace(/_/g, ' ');
 
         const img = document.createElement('img');
