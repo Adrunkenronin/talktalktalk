@@ -1003,7 +1003,7 @@ function applyBoardAndPieces() {
     const boardUrl = typeof boardData === 'object' ? boardData.url : boardData;
     const board = document.getElementById('chess-board');
     if (board) {
-        const imageSrc = boardUrl.replace('{size}', '600').replace('{}', '600');
+        const imageSrc = boardUrl.replace(/{size}/g, '600');
         board.style.backgroundImage = `url('${imageSrc}')`;
     }
 
