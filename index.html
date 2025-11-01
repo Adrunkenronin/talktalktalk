@@ -1941,6 +1941,7 @@ function ready() {
     // Board and Pieces modal handlers
     $('#board-pieces-btn').on('click', function(e) {
         e.stopPropagation();
+        $('#chess-settings-dropdown').addClass('hidden');
         $('#board-pieces-modal').removeClass('hidden');
         if (!boardPiecesSettings.boardsData) {
             loadBoardPiecesData();
