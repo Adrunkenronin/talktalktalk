@@ -1914,6 +1914,26 @@ function ready() {
         }
     }
 
+    // Board and Pieces modal handlers
+    $('#board-pieces-btn').on('click', function(e) {
+        e.stopPropagation();
+        $('#board-pieces-modal').removeClass('hidden');
+        if (!boardPiecesSettings.boardsData) {
+            loadBoardPiecesData();
+        }
+    });
+
+    $('#board-pieces-close').on('click', function() {
+        $('#board-pieces-modal').addClass('hidden');
+    });
+
+    // Close board-pieces modal when clicking outside
+    $('#board-pieces-modal').on('click', function(e) {
+        if (e.target.id === 'board-pieces-modal') {
+            $(this).addClass('hidden');
+        }
+    });
+
     // Chess modal controls
     $('#chess-close').on('click', function(){
         $('#chess-modal').addClass('hidden');
