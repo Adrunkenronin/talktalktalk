@@ -939,19 +939,12 @@ function initializeBoardPiecesModal() {
         }
 
         const urlTemplate = typeof pieceUrl === 'object' ? pieceUrl.url : pieceUrl;
-        const knightCode = 'wn';
-        const color = knightCode.charAt(0);
-        const type = knightCode.charAt(1);
-        let knightUrl = urlTemplate;
-        let braceCount = 0;
-        knightUrl = knightUrl.replace(/{}/g, () => {
-            braceCount++;
-            if (braceCount === 1) {
-                return color;
-            } else {
-                return type;
-            }
-        });
+        const color = 'w';
+        const piece = 'n';
+        let knightUrl = urlTemplate
+            .replace(/{color}/g, color)
+            .replace(/{piece}/g, piece);
+
         const displayName = pieceName.replace(/_/g, ' ');
 
         const previewDiv = document.createElement('div');
