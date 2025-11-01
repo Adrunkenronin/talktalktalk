@@ -1098,13 +1098,15 @@ function renderBoard() {
     var board = $('#chess-board');
     board.empty();
 
-    // Apply board background
+    // Apply board background with fallback size
     if (boardPiecesSettings.boardsData && boardPiecesSettings.selectedBoard) {
         var boardData = boardPiecesSettings.boardsData[boardPiecesSettings.selectedBoard];
         if (boardData) {
             var boardUrlTemplate = typeof boardData === 'object' ? boardData.url : boardData;
-            var boardUrl = boardUrlTemplate.replace(/{size}/g, '600');
+            var boardUrl = boardUrlTemplate.replace(/{size}/g, '300');
             board.css('backgroundImage', 'url(' + boardUrl + ')');
+            board.css('backgroundSize', 'cover');
+            board.css('backgroundPosition', 'center');
         }
     }
 
