@@ -1021,15 +1021,9 @@ function updateChessPieceImages(pieceData) {
             const color = pieceCode.charAt(0);
             const type = pieceCode.charAt(1);
 
-            let url = urlTemplate;
-            let firstBrace = true;
-            url = url.replace(/{}/g, () => {
-                if (firstBrace) {
-                    firstBrace = false;
-                    return color;
-                }
-                return type;
-            });
+            let url = urlTemplate
+                .replace(/{color}/g, color)
+                .replace(/{piece}/g, type);
 
             piece.style.backgroundImage = `url('${url}')`;
         }
