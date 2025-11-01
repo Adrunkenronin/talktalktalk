@@ -1731,6 +1731,7 @@ function ready() {
         try {
             var stored = null;
             try { stored = JSON.parse(localStorage.getItem('active_game') || 'null'); } catch(e) { stored = null; }
+            console.debug('rejoin click', {wsState: ws && ws.readyState, stored: stored});
             if (stored && stored.id && ws && ws.readyState === 1) {
                 ws.send(JSON.stringify({ type: 'chess_resume_request', game_id: stored.id }));
                 flashStatus('Requesting to rejoin game...');
