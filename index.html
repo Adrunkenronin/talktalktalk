@@ -733,6 +733,8 @@ var premoveQueue = [];
 var currentTentative = null; // {from,to,isPremove}
 // Guards to prevent re-entrant premove processing and concurrent engine fetches
 var __processingPremoves = false;
+// Chess settings
+var chessSettings = { confirmMoves: true, premoveEnabled: true };
 
 // Stockfish state
 var stockfishGame = null; // {fen, turn, color, engineColor, elo, over}
