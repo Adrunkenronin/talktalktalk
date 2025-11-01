@@ -909,8 +909,9 @@ function initializeBoardPiecesModal() {
         }
 
         const piecePreviewPairs = [['w', 'k'], ['w', 'q'], ['w', 'p'], ['b', 'k'], ['b', 'q'], ['b', 'p']];
-        const previewHTML = piecePreviewPairs.map(([color, piece]) => {
+        const previewHTML = piecePreviewPairs.map(([color, pieceType]) => {
             const urlTemplate = typeof pieceUrl === 'object' ? pieceUrl.url : pieceUrl;
+            const fullPieceCode = color + pieceType;
             let url = urlTemplate;
             let firstBrace = true;
             url = url.replace(/{}/g, () => {
@@ -918,9 +919,9 @@ function initializeBoardPiecesModal() {
                     firstBrace = false;
                     return color;
                 }
-                return piece;
+                return fullPieceCode;
             });
-            return `<img class="piece-preview-icon" src="${url}" alt="${color}${piece}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22%3E%3Crect fill=%22%23eee%22 width=%2232%22 height=%2232%22/%3E%3C/svg%3E'" />`;
+            return `<img class="piece-preview-icon" src="${url}" alt="${fullPieceCode}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22%3E%3Crect fill=%22%23eee%22 width=%2232%22 height=%2232%22/%3E%3C/svg%3E'" />`;
         }).join('');
 
         const cardHTML = `
