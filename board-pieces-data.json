@@ -61,14 +61,14 @@
         "nature": "pieces/nature/{color}{piece}.png",
         "neo": "pieces/neo/{color}{piece}.png",
         "neo_wood": "pieces/neo_wood/{color}{piece}.png",
-        "neon": "pieces/neon/{color}/{piece}.png",
-        "newspaper": "pieces/newspaper/{color}/{piece}.png",
-        "ocean": "pieces/ocean/{color}/{piece}.png",
-        "sky": "pieces/sky/{color}/{piece}.png",
-        "space": "pieces/space/{color}/{piece}.png",
-        "tigers": "pieces/tigers/{color}/{piece}.png",
-        "tournament": "pieces/tournament/{color}/{piece}.png",
-        "vintage": "pieces/vintage/{color}/{piece}.png",
-        "wood": "pieces/wood/{color}/{piece}.png"
+        "neon": "pieces/neon/{color}{piece}.png",
+        "newspaper": "pieces/newspaper/{color}{piece}.png",
+        "ocean": "pieces/ocean/{color}{piece}.png",
+        "sky": "pieces/sky/{color}{piece}.png",
+        "space": "pieces/space/{color}{piece}.png",
+        "tigers": "pieces/tigers/{color}{piece}.png",
+        "tournament": "pieces/tournament/{color}{piece}.png",
+        "vintage": "pieces/vintage/{color}{piece}.png",
+        "wood": "pieces/wood/{color}{piece}.png"
     }
 }
