@@ -285,6 +285,50 @@ html {
     margin-bottom: 0.75rem;
 }
 
+.top-right-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+    gap: 0.5rem;
+}
+
+.top-right-controls h3 {
+    margin: 0;
+    flex: 1;
+}
+
+.control-buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+}
+
+.control-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+    transition: color 0.2s ease, transform 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: var(--radius-md);
+    white-space: nowrap;
+}
+
+.control-btn:hover {
+    color: var(--accent-primary);
+    transform: scale(1.05);
+}
+
+.control-btn i {
+    font-size: 0.875rem;
+}
+
 #username { 
     padding: 0.5rem 0.75rem;
     background: var(--bg-tertiary);
@@ -487,11 +531,48 @@ html {
 .chess-square.drag-over { outline: 3px solid var(--accent-primary); outline-offset: -3px; }
 .chess-square.in-check { box-shadow: inset 0 0 0 3px rgba(220, 53, 69, 0.6); }
 .chess-panel { border: 1px solid var(--border-light); border-radius: var(--radius-lg); padding: 0.75rem; height: 100%; display: flex; flex-direction: column; gap: 0.5rem; }
-.chess-panel h4 { margin-bottom: 0.25rem; color: var(--text-secondary); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.chess-panel-header { position: relative; display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem; }
+.chess-panel h4 { margin: 0; color: var(--text-secondary); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.chess-settings-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 0.25rem 0.5rem; font-size: 0.875rem; transition: color 0.2s ease, transform 0.2s ease; }
+.chess-settings-btn:hover { color: var(--accent-primary); transform: scale(1.1); }
+.chess-settings-dropdown { position: absolute; top: 100%; right: -0.75rem; background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: var(--radius-md); box-shadow: var(--shadow-md); padding: 0.5rem 0; min-width: 180px; z-index: 100; margin-top: 0.5rem; }
+.chess-settings-dropdown.hidden { display: none; }
+.chess-settings-toggle { display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.5rem 0.75rem; border: none; background: none; color: var(--text-primary); cursor: pointer; font-size: 0.875rem; text-align: left; transition: background 0.2s ease; }
+.chess-settings-toggle:hover { background: var(--accent-secondary); }
+.chess-settings-toggle i { font-size: 1rem; color: var(--accent-primary); min-width: 1.25rem; }
+.chess-settings-toggle.disabled i { color: var(--text-muted); opacity: 0.5; }
+.chess-settings-divider { height: 1px; background: var(--border-light); margin: 0.5rem 0; }
+.chess-settings-button { display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.5rem 0.75rem; border: none; background: none; color: var(--text-primary); cursor: pointer; font-size: 0.875rem; text-align: left; transition: background 0.2s ease; }
+.chess-settings-button:hover { background: var(--accent-secondary); }
+
+/* Board and Pieces Modal */
+.board-pieces-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.board-pieces-modal.hidden { display: none; }
+.board-pieces-panel { background: var(--bg-secondary); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); max-width: 90%; max-height: 90vh; display: flex; flex-direction: column; width: 900px; }
+.board-pieces-header { display: flex; align-items: center; justify-content: space-between; padding: 1.5rem; border-bottom: 1px solid var(--border-light); }
+.board-pieces-header h2 { margin: 0; font-size: 1.5rem; color: var(--text-primary); }
+.board-pieces-close { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.5rem; padding: 0; transition: color 0.2s ease; }
+.board-pieces-close:hover { color: var(--accent-primary); }
+.board-pieces-content { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 2rem; }
+.board-pieces-section h3 { margin: 0 0 1rem 0; font-size: 1.125rem; color: var(--text-primary); }
+.boards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 1rem; }
+.pieces-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 1rem; }
+.board-card { padding: 0.75rem; border: 2px solid var(--border-light); border-radius: var(--radius-md); background: var(--bg-tertiary); cursor: pointer; transition: all 0.2s ease; text-align: center; }
+.board-card:hover { border-color: var(--accent-primary); background: var(--accent-secondary); }
+.board-card.selected { border-color: var(--accent-primary); background: var(--accent-secondary); font-weight: 600; }
+.board-card-name { font-size: 0.875rem; color: var(--text-primary); font-weight: 500; }
+.board-card-preview { width: 100%; height: 80px; background: white; border-radius: var(--radius-sm); margin-bottom: 0.5rem; object-fit: cover; }
+.piece-card { padding: 0.75rem; border: 2px solid var(--border-light); border-radius: var(--radius-md); background: var(--bg-tertiary); cursor: pointer; transition: all 0.2s ease; text-align: center; }
+.piece-card:hover { border-color: var(--accent-primary); background: var(--accent-secondary); }
+.piece-card.selected { border-color: var(--accent-primary); background: var(--accent-secondary); font-weight: 600; }
+.piece-card-name { font-size: 0.875rem; color: var(--text-primary); font-weight: 500; }
+.piece-preview { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 0.5rem; }
+.piece-preview-icon { width: 100%; aspect-ratio: 1; }
 .chess-status { min-height: 1.5rem; color: var(--text-secondary); }
 .chess-actions { margin-top: auto; display: flex; gap: 0.5rem; }
 .chess-button { padding: 0.5rem 0.75rem; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: var(--bg-secondary); cursor: pointer; }
 .chess-button:hover { background: var(--accent-secondary); color: var(--accent-primary); }
+.chess-button.hidden { display: none; }
 /* Confirm move button (neon green) */
 .confirm-move-button { background: #39ff14; border: 1px solid #39ff14; color: #000; font-weight: 600; }
 .confirm-move-button:hover { filter: brightness(1.1); }
@@ -564,9 +645,27 @@ html {
 <button id="sidebar-toggle" aria-label="Open sidebar" title="Menu"><i class="fas fa-users"></i></button>
 
 <div id="right">
-    <h3>ZYBERCOMMS</h3>
-    
-    
+    <div class="top-right-controls">
+        <h3>ZYBERCOMMS</h3>
+        <div class="control-buttons">
+            <button class="control-btn chess-settings-btn" id="chess-settings-btn" title="Settings">
+                <i class="fas fa-cog"></i>
+            </button>
+            <div class="chess-settings-dropdown hidden" id="chess-settings-dropdown">
+                <button class="chess-settings-toggle" data-setting="confirm-moves" title="Toggle confirm moves requirement">
+                    <i class="fas fa-toggle-on"></i> Confirm moves
+                </button>
+                <button class="chess-settings-toggle" data-setting="premove" title="Toggle premove ability">
+                    <i class="fas fa-toggle-on"></i> Premove
+                </button>
+                <div class="chess-settings-divider"></div>
+                <button class="chess-settings-button" id="board-pieces-btn" title="Board and Pieces">
+                    <i class="fas fa-chess"></i> Board & Pieces
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div>
         <h3>Username</h3>
         <span id="username" class="dashed">user</span>
@@ -628,7 +727,9 @@ html {
   <div class="chess-layout">
     <div class="chess-board" id="chess-board"></div>
     <div class="chess-panel">
-      <h4>Chess</h4>
+      <div class="chess-panel-header">
+        <h4>Chess</h4>
+      </div>
       <div class="history-controls" style="display:flex;gap:0.5rem;align-items:center;">
         <button class="chess-button" id="chess-prev" title="Previous move"><i class="fas fa-chevron-left"></i></button>
         <button class="chess-button" id="chess-next" title="Next move"><i class="fas fa-chevron-right"></i></button>
@@ -654,6 +755,29 @@ html {
     </div>
   </div>
 </div>
+
+<!-- Board and Pieces Selection Modal -->
+<div id="board-pieces-modal" class="hidden board-pieces-modal">
+  <div class="board-pieces-panel">
+    <div class="board-pieces-header">
+      <h2>Board and Pieces</h2>
+      <button class="board-pieces-close" id="board-pieces-close" title="Close">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="board-pieces-content">
+      <div class="board-pieces-section">
+        <h3>Boards</h3>
+        <div class="boards-grid" id="boards-grid"></div>
+      </div>
+      <div class="board-pieces-section">
+        <h3>Pieces</h3>
+        <div class="pieces-grid" id="pieces-grid"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script type="text/javascript">
 var popsound = new Audio('popsound.mp3');
 popsound.muted = true; // Mute initially to comply with browser autoplay policies
@@ -713,6 +837,123 @@ var premoveQueue = [];
 var currentTentative = null; // {from,to,isPremove}
 // Guards to prevent re-entrant premove processing and concurrent engine fetches
 var __processingPremoves = false;
+// Chess settings
+var chessSettings = { confirmMoves: true, premoveEnabled: true };
+
+// Board and Pieces settings
+var boardPiecesSettings = {
+    selectedBoard: 'tan',
+    selectedPieces: 'classic',
+    boardsData: null,
+    piecesData: null
+};
+
+// Load boards and pieces data
+function loadBoardPiecesData() {
+    fetch('https://raw.githubusercontent.com/Adrunkenronin/chess.com-boards-and-pieces/master/data.json')
+        .then(response => response.json())
+        .then(data => {
+            boardPiecesSettings.boardsData = data.boards || {};
+            boardPiecesSettings.piecesData = data.pieces || {};
+            initializeBoardPiecesModal();
+        })
+        .catch(error => console.error('Failed to load board pieces data:', error));
+}
+
+function initializeBoardPiecesModal() {
+    if (!boardPiecesSettings.boardsData || !boardPiecesSettings.piecesData) return;
+
+    const boardsGrid = document.getElementById('boards-grid');
+    const piecesGrid = document.getElementById('pieces-grid');
+
+    // Create board cards
+    Object.entries(boardPiecesSettings.boardsData).forEach(([boardName, boardData]) => {
+        const card = document.createElement('div');
+        card.className = 'board-card';
+        if (boardName === boardPiecesSettings.selectedBoard) {
+            card.classList.add('selected');
+        }
+
+        const previewUrl = boardData.url.replace('{size}', '140');
+        const cardHTML = `
+            <img class="board-card-preview" src="${previewUrl}" alt="${boardName}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22140%22 height=%22140%22%3E%3Crect fill=%22%23ccc%22 width=%22140%22 height=%22140%22/%3E%3C/svg%3E'" />
+            <div class="board-card-name">${boardName.replace(/_/g, ' ')}</div>
+        `;
+        card.innerHTML = cardHTML;
+        card.addEventListener('click', () => selectBoard(boardName, card));
+        boardsGrid.appendChild(card);
+    });
+
+    // Create piece cards
+    Object.entries(boardPiecesSettings.piecesData).forEach(([pieceName, pieceData]) => {
+        const card = document.createElement('div');
+        card.className = 'piece-card';
+        if (pieceName === boardPiecesSettings.selectedPieces) {
+            card.classList.add('selected');
+        }
+
+        const pieceNames = ['wk', 'wq', 'wp', 'bk', 'bq', 'bp'];
+        const previewHTML = pieceNames.map(piece => {
+            const url = pieceData.url.replace('{size}', '32').replace('{piece}', piece);
+            return `<img class="piece-preview-icon" src="${url}" alt="${piece}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22%3E%3Crect fill=%22%23eee%22 width=%2232%22 height=%2232%22/%3E%3C/svg%3E'" />`;
+        }).join('');
+
+        const cardHTML = `
+            <div class="piece-preview">${previewHTML}</div>
+            <div class="piece-card-name">${pieceName.replace(/_/g, ' ')}</div>
+        `;
+        card.innerHTML = cardHTML;
+        card.addEventListener('click', () => selectPieces(pieceName, card));
+        piecesGrid.appendChild(card);
+    });
+}
+
+function selectBoard(boardName, cardElement) {
+    document.querySelectorAll('.board-card').forEach(card => card.classList.remove('selected'));
+    cardElement.classList.add('selected');
+    boardPiecesSettings.selectedBoard = boardName;
+    applyBoardAndPieces();
+}
+
+function selectPieces(pieceName, cardElement) {
+    document.querySelectorAll('.piece-card').forEach(card => card.classList.remove('selected'));
+    cardElement.classList.add('selected');
+    boardPiecesSettings.selectedPieces = pieceName;
+    applyBoardAndPieces();
+}
+
+function applyBoardAndPieces() {
+    if (!boardPiecesSettings.boardsData || !boardPiecesSettings.piecesData) return;
+
+    const boardData = boardPiecesSettings.boardsData[boardPiecesSettings.selectedBoard];
+    const pieceData = boardPiecesSettings.piecesData[boardPiecesSettings.selectedPieces];
+
+    if (!boardData || !pieceData) return;
+
+    // Update board background
+    const boardUrl = boardData.url.replace('{size}', '600');
+    const board = document.getElementById('chess-board');
+    if (board) {
+        board.style.backgroundImage = `url('${boardUrl}')`;
+    }
+
+    // Update piece images
+    updateChessPieceImages(pieceData);
+}
+
+function updateChessPieceImages(pieceData) {
+    const squares = document.querySelectorAll('.chess-square');
+    squares.forEach(square => {
+        const piece = square.getAttribute('data-piece');
+        if (piece) {
+            const pieceUrl = pieceData.url.replace('{size}', '60').replace('{piece}', piece);
+            const img = square.querySelector('.piece-img');
+            if (img) {
+                img.src = pieceUrl;
+            }
+        }
+    });
+}
 
 // Stockfish state
 var stockfishGame = null; // {fen, turn, color, engineColor, elo, over}
@@ -781,6 +1022,16 @@ function renderBoard() {
     if (!chessGame) return;
     var board = $('#chess-board');
     board.empty();
+
+    // Apply board background
+    if (boardPiecesSettings.boardsData && boardPiecesSettings.selectedBoard) {
+        var boardData = boardPiecesSettings.boardsData[boardPiecesSettings.selectedBoard];
+        if (boardData) {
+            var boardUrl = boardData.url.replace('{size}', '600');
+            board.css('backgroundImage', 'url(' + boardUrl + ')');
+        }
+    }
+
     if (pendingPromotion) {
         hidePromotionDialog();
     } else {
@@ -819,6 +1070,16 @@ function renderBoard() {
         var pieceCode = chessGame.squareMap[sq];
         if (pieceCode) {
             var pieceEl = $('<div/>').addClass('chess-piece').addClass('piece-' + pieceCode).attr('draggable', true).attr('data-square', sq).attr('data-piece', pieceCode);
+
+            // Apply custom piece image if available
+            if (boardPiecesSettings.piecesData && boardPiecesSettings.selectedPieces) {
+                var pieceData = boardPiecesSettings.piecesData[boardPiecesSettings.selectedPieces];
+                if (pieceData) {
+                    var pieceUrl = pieceData.url.replace('{size}', '60').replace('{piece}', pieceCode);
+                    pieceEl.css('backgroundImage', 'url(' + pieceUrl + ')');
+                }
+            }
+
             el.append(pieceEl);
         }
         var histEntry = (chessGame.moveHistory && typeof chessGame.historyIndex !== 'undefined') ? chessGame.moveHistory[chessGame.historyIndex] : null;
@@ -943,6 +1204,13 @@ function clearPendingMove(){
 function stageMove(from, to, promotion){
     // Clear existing tentative visuals
     clearTentativeMoveVisuals();
+
+    // If confirm moves is disabled, send immediately
+    if (!chessSettings.confirmMoves) {
+        sendMove(from, to, promotion);
+        return;
+    }
+
     pendingUserMove = { from: from, to: to, promotion: promotion || null };
     $('#chess-board .chess-square').removeClass('selected');
     $('#chess-board .chess-square[data-square="' + from + '"]').addClass('selected');
@@ -1067,6 +1335,11 @@ function attemptMove(from, to) {
         if (myTurn) {
             stageMove(from, to, null);
         } else {
+            if (!chessSettings.premoveEnabled) {
+                flashStatus('Premove disabled');
+                clearSelection();
+                return;
+            }
             enqueuePremove(from, to, null);
         }
     }
@@ -1159,7 +1432,11 @@ function onPromotionChoice() {
     hidePromotionDialog();
     if (!details || !promotion) return;
     if (details.mode === 'premove') {
-        enqueuePremove(details.from, details.to, promotion);
+        if (chessSettings.premoveEnabled) {
+            enqueuePremove(details.from, details.to, promotion);
+        } else {
+            flashStatus('Premove disabled');
+        }
     } else {
         stageMove(details.from, details.to, promotion);
     }
@@ -1605,9 +1882,87 @@ function ready() {
     // Sidebar toggle (mobile)
     $('#sidebar-toggle').on('click', function(){ $('#right').toggleClass('open'); });
 
+    // Chess settings dropdown toggle
+    $('#chess-settings-btn').on('click', function(e) {
+        e.stopPropagation();
+        $('#chess-settings-dropdown').toggleClass('hidden');
+    });
+
+    // Close settings dropdown when clicking outside
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('#chess-settings-btn, #chess-settings-dropdown, .control-buttons').length) {
+            $('#chess-settings-dropdown').addClass('hidden');
+        }
+    });
+
+    // Chess settings toggle buttons
+    $('#chess-settings-dropdown').on('click', '.chess-settings-toggle', function(e) {
+        e.preventDefault();
+        var setting = $(this).data('setting');
+        if (setting === 'confirm-moves') {
+            chessSettings.confirmMoves = !chessSettings.confirmMoves;
+            updateSettingUI('confirm-moves');
+            if (!chessSettings.confirmMoves && pendingUserMove) {
+                clearPendingMove();
+            }
+        } else if (setting === 'premove') {
+            chessSettings.premoveEnabled = !chessSettings.premoveEnabled;
+            updateSettingUI('premove');
+            if (!chessSettings.premoveEnabled) {
+                clearAllPremoves();
+            }
+        }
+    });
+
+    function updateSettingUI(setting) {
+        var $toggle = $('#chess-settings-dropdown').find('[data-setting="' + setting + '"]');
+        var $icon = $toggle.find('i');
+        if (setting === 'confirm-moves') {
+            if (chessSettings.confirmMoves) {
+                $icon.removeClass('fa-toggle-off').addClass('fa-toggle-on');
+                $toggle.removeClass('disabled');
+                $('#chess-confirm-move').removeClass('hidden');
+            } else {
+                $icon.removeClass('fa-toggle-on').addClass('fa-toggle-off');
+                $toggle.addClass('disabled');
+                $('#chess-confirm-move').addClass('hidden');
+            }
+        } else if (setting === 'premove') {
+            if (chessSettings.premoveEnabled) {
+                $icon.removeClass('fa-toggle-off').addClass('fa-toggle-on');
+                $toggle.removeClass('disabled');
+            } else {
+                $icon.removeClass('fa-toggle-on').addClass('fa-toggle-off');
+                $toggle.addClass('disabled');
+            }
+        }
+    }
+
+    // Board and Pieces modal handlers
+    $('#board-pieces-btn').on('click', function(e) {
+        e.stopPropagation();
+        $('#chess-settings-dropdown').addClass('hidden');
+        $('#board-pieces-modal').removeClass('hidden');
+        if (!boardPiecesSettings.boardsData) {
+            loadBoardPiecesData();
+        }
+    });
+
+    $('#board-pieces-close').on('click', function() {
+        $('#board-pieces-modal').addClass('hidden');
+    });
+
+    // Close board-pieces modal when clicking outside
+    $('#board-pieces-modal').on('click', function(e) {
+        if (e.target.id === 'board-pieces-modal') {
+            $(this).addClass('hidden');
+        }
+    });
+
     // Chess modal controls
     $('#chess-close').on('click', function(){
         $('#chess-modal').addClass('hidden');
+        $('#chess-settings-dropdown').addClass('hidden');
         if (stockfishGame) {
             stockfishGame = null;
             chessGame = null;
@@ -1715,6 +2070,7 @@ function ready() {
             __chessUnread = 0; __updateTitleBadge();
             renderBoard();
             updateChessStatus();
+            updateSettingUI('confirm-moves');
         }
     });
 
@@ -1772,6 +2128,7 @@ function ready() {
         renderBoard();
         updateHistoryControls && updateHistoryControls();
         $('#chess-modal').removeClass('hidden');
+        updateSettingUI('confirm-moves');
     }
 
     // WebSocket message handler
@@ -1944,7 +2301,10 @@ function ready() {
     };
 }
 
-$(document).ready(ready);
+$(document).ready(function() {
+    ready();
+    loadBoardPiecesData();
+});
 
 </script>
 <script>
