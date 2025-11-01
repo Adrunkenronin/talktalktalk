@@ -2296,7 +2296,10 @@ function ready() {
     };
 }
 
-$(document).ready(ready);
+$(document).ready(function() {
+    ready();
+    loadBoardPiecesData();
+});
 
 </script>
 <script>
