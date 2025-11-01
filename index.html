@@ -904,9 +904,10 @@ function initializeBoardPiecesModal() {
 
         const previewUrl = typeof boardUrl === 'object' ? boardUrl.url : boardUrl;
         const imageSrc = previewUrl.replace('{size}', '140').replace('{}', '140');
+        const displayName = boardName.replace(/_/g, ' ');
         const cardHTML = `
-            <img class="board-card-preview" src="${imageSrc}" alt="${boardName}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22140%22 height=%22140%22%3E%3Crect fill=%22%23ccc%22 width=%22140%22 height=%22140%22/%3E%3C/svg%3E'" />
-            <div class="board-card-name">${boardName.replace(/_/g, ' ')}</div>
+            <img class="board-card-preview" src="${imageSrc}" alt="${displayName}" onerror="this.style.display='none';this.parentElement.innerHTML+='<span style=\\"font-size:0.85rem;color:var(--text-secondary);text-align:center;\\">${displayName}</span>'" />
+            <div class="board-card-name">${displayName}</div>
         `;
         card.innerHTML = cardHTML;
         card.addEventListener('click', () => selectBoard(boardName, card));
