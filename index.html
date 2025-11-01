@@ -882,16 +882,17 @@ function initializeBoardPiecesModal() {
     piecesGrid.innerHTML = '';
 
     // Create board cards
-    Object.entries(boardPiecesSettings.boardsData).forEach(([boardName, boardData]) => {
+    Object.entries(boardPiecesSettings.boardsData).forEach(([boardName, boardUrl]) => {
         const card = document.createElement('div');
         card.className = 'board-card';
         if (boardName === boardPiecesSettings.selectedBoard) {
             card.classList.add('selected');
         }
 
-        const previewUrl = boardData.url.replace('{size}', '140');
+        const previewUrl = typeof boardUrl === 'object' ? boardUrl.url : boardUrl;
+        const imageSrc = previewUrl.replace('{size}', '140').replace('{}', '140');
         const cardHTML = `
-            <img class="board-card-preview" src="${previewUrl}" alt="${boardName}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22140%22 height=%22140%22%3E%3Crect fill=%22%23ccc%22 width=%22140%22 height=%22140%22/%3E%3C/svg%3E'" />
+            <img class="board-card-preview" src="${imageSrc}" alt="${boardName}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22140%22 height=%22140%22%3E%3Crect fill=%22%23ccc%22 width=%22140%22 height=%22140%22/%3E%3C/svg%3E'" />
             <div class="board-card-name">${boardName.replace(/_/g, ' ')}</div>
         `;
         card.innerHTML = cardHTML;
@@ -900,17 +901,19 @@ function initializeBoardPiecesModal() {
     });
 
     // Create piece cards
-    Object.entries(boardPiecesSettings.piecesData).forEach(([pieceName, pieceData]) => {
+    Object.entries(boardPiecesSettings.piecesData).forEach(([pieceName, pieceUrl]) => {
         const card = document.createElement('div');
         card.className = 'piece-card';
         if (pieceName === boardPiecesSettings.selectedPieces) {
             card.classList.add('selected');
         }
 
-        const pieceNames = ['wk', 'wq', 'wp', 'bk', 'bq', 'bp'];
-        const previewHTML = pieceNames.map(piece => {
-            const url = pieceData.url.replace('{size}', '32').replace('{piece}', piece);
-            return `<img class="piece-preview-icon" src="${url}" alt="${piece}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22%3E%3Crect fill=%22%23eee%22 width=%2232%22 height=%2232%22/%3E%3C/svg%3E'" />`;
+        const piecePreviewPairs = [['w', 'k'], ['w', 'q'], ['w', 'p'], ['b', 'k'], ['b', 'q'], ['b', 'p']];
+        const previewHTML = piecePreviewPairs.map(([color, piece]) => {
+            const urlTemplate = typeof pieceUrl === 'object' ? pieceUrl.url : pieceUrl;
+            const url = urlTemplate.replace('{size}', '32').replace('{}', color).replace('{}', piece).replace('/{}/{}.png', `/${color}/${color}${piece}.png`);
+            const finalUrl = url.includes('{') ? urlTemplate.replace('/{}/{}.png', `/${color}/${color}${piece}.png`) : url;
+            return `<img class="piece-preview-icon" src="${finalUrl}" alt="${color}${piece}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22%3E%3Crect fill=%22%23eee%22 width=%2232%22 height=%2232%22/%3E%3C/svg%3E'" />`;
         }).join('');
 
         const cardHTML = `
