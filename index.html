@@ -885,6 +885,11 @@ function initializeBoardPiecesModal() {
         return;
     }
 
+    console.log('Initializing boards and pieces modal with:', {
+        boards: Object.keys(boardPiecesSettings.boardsData).length,
+        pieces: Object.keys(boardPiecesSettings.piecesData).length
+    });
+
     // Clear existing cards
     boardsGrid.innerHTML = '';
     piecesGrid.innerHTML = '';
