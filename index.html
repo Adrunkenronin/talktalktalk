@@ -947,6 +947,12 @@ function sendMove(from, to, promotion) {
     clearSelection();
     $('#chess-board .chess-square').removeClass('drag-over');
     clearPendingMove();
+
+    // If confirm moves is disabled, auto-confirm immediately
+    if (!chessSettings.confirmMoves) {
+        pendingUserMove = null;
+        updateConfirmButton();
+    }
 }
 
 function updateConfirmButton(){
