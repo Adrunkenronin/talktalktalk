@@ -521,11 +521,11 @@ html {
 
 #chess-modal { z-index: 1000; position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 95vw; max-width: 720px; background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 1rem; }
 .chess-layout { display: grid; grid-template-columns: 1fr 240px; gap: 1rem; }
-.chess-board { width: 100%; aspect-ratio: 1 / 1; display: grid; grid-template-columns: repeat(8, 1fr); border: 1px solid var(--border-light); border-radius: var(--radius-lg); overflow: hidden; }
-.chess-square { display: flex; align-items: center; justify-content: center; user-select: none; cursor: pointer; position: relative; }
+.chess-board { width: 100%; aspect-ratio: 1 / 1; display: grid; grid-template-columns: repeat(8, 1fr); border: 1px solid var(--border-light); border-radius: var(--radius-lg); overflow: hidden; background-size: cover; background-position: center; background-repeat: no-repeat; }
+.chess-square { display: flex; align-items: center; justify-content: center; user-select: none; cursor: pointer; position: relative; background-color: transparent !important; }
 :root { --chess-light: #eeeed2; --chess-dark: #769656; }
-.chess-square.light { background: var(--chess-light); }
-.chess-square.dark { background: var(--chess-dark); }
+.chess-square.light { background-color: transparent !important; }
+.chess-square.dark { background-color: transparent !important; }
 .chess-square.selected { outline: 3px solid var(--accent-primary); outline-offset: -3px; }
 .chess-square.lastmove { box-shadow: inset 0 0 0 3px rgba(246, 223, 99, 0.45); }
 .chess-square.drag-over { outline: 3px solid var(--accent-primary); outline-offset: -3px; }
@@ -903,12 +903,29 @@ function initializeBoardPiecesModal() {
         }
 
         const previewUrl = typeof boardUrl === 'object' ? boardUrl.url : boardUrl;
-        const imageSrc = previewUrl.replace('{size}', '140').replace('{}', '140');
-        const cardHTML = `
-            <img class="board-card-preview" src="${imageSrc}" alt="${boardName}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22140%22 height=%22140%22%3E%3Crect fill=%22%23ccc%22 width=%22140%22 height=%22140%22/%3E%3C/svg%3E'" />
-            <div class="board-card-name">${boardName.replace(/_/g, ' ')}</div>
-        `;
-        card.innerHTML = cardHTML;
+        const imageSrc = previewUrl.replace(/{size}/g, '140');
+        const displayName = boardName.replace(/_/g, ' ');
+
+        const img = document.createElement('img');
+        img.className = 'board-card-preview';
+        img.alt = displayName;
+        img.src = imageSrc;
+        img.onerror = function() {
+            img.style.display = 'none';
+            const nameSpan = document.createElement('span');
+            nameSpan.style.fontSize = '0.85rem';
+            nameSpan.style.color = 'var(--text-secondary)';
+            nameSpan.style.display = 'block';
+            nameSpan.textContent = displayName;
+            card.appendChild(nameSpan);
+        };
+
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'board-card-name';
+        nameDiv.textContent = displayName;
+
+        card.appendChild(img);
+        card.appendChild(nameDiv);
         card.addEventListener('click', () => selectBoard(boardName, card));
         boardsGrid.appendChild(card);
     });
@@ -922,26 +939,39 @@ function initializeBoardPiecesModal() {
         }
 
         const urlTemplate = typeof pieceUrl === 'object' ? pieceUrl.url : pieceUrl;
-        const knightCode = 'wn';
-        const color = knightCode.charAt(0);
-        const type = knightCode.charAt(1);
-        let knightUrl = urlTemplate;
-        let braceCount = 0;
-        knightUrl = knightUrl.replace(/{}/g, () => {
-            braceCount++;
-            if (braceCount === 1) {
-                return color;
-            } else {
-                return type;
-            }
-        });
-        const previewHTML = `<img class="piece-preview-icon" src="${knightUrl}" alt="knight" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2290%22 height=%2290%22%3E%3Crect fill=%22%23eee%22 width=%2290%22 height=%2290%22/%3E%3C/svg%3E'" />`;
+        const color = 'w';
+        const piece = 'n';
+        let knightUrl = urlTemplate
+            .replace(/{color}/g, color)
+            .replace(/{piece}/g, piece);
 
-        const cardHTML = `
-            <div class="piece-preview">${previewHTML}</div>
-            <div class="piece-card-name">${pieceName.replace(/_/g, ' ')}</div>
-        `;
-        card.innerHTML = cardHTML;
+        const displayName = pieceName.replace(/_/g, ' ');
+
+        const previewDiv = document.createElement('div');
+        previewDiv.className = 'piece-preview';
+
+        const img = document.createElement('img');
+        img.className = 'piece-preview-icon';
+        img.alt = displayName;
+        img.src = knightUrl;
+        img.onerror = function() {
+            img.style.display = 'none';
+            const nameSpan = document.createElement('span');
+            nameSpan.style.fontSize = '0.85rem';
+            nameSpan.style.color = 'var(--text-secondary)';
+            nameSpan.style.textAlign = 'center';
+            nameSpan.textContent = displayName;
+            previewDiv.appendChild(nameSpan);
+        };
+
+        previewDiv.appendChild(img);
+
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'piece-card-name';
+        nameDiv.textContent = displayName;
+
+        card.appendChild(previewDiv);
+        card.appendChild(nameDiv);
         card.addEventListener('click', () => selectPieces(pieceName, card));
         piecesGrid.appendChild(card);
     });
@@ -969,12 +999,14 @@ function applyBoardAndPieces() {
 
     if (!boardData || !pieceData) return;
 
-    // Update board background
+    // Update board background with fallback size
     const boardUrl = typeof boardData === 'object' ? boardData.url : boardData;
     const board = document.getElementById('chess-board');
     if (board) {
-        const imageSrc = boardUrl.replace('{size}', '600').replace('{}', '600');
+        const imageSrc = boardUrl.replace(/{size}/g, '300');
         board.style.backgroundImage = `url('${imageSrc}')`;
+        board.style.backgroundSize = 'cover';
+        board.style.backgroundPosition = 'center';
     }
 
     // Update piece images
@@ -991,15 +1023,9 @@ function updateChessPieceImages(pieceData) {
             const color = pieceCode.charAt(0);
             const type = pieceCode.charAt(1);
 
-            let url = urlTemplate;
-            let firstBrace = true;
-            url = url.replace(/{}/g, () => {
-                if (firstBrace) {
-                    firstBrace = false;
-                    return color;
-                }
-                return type;
-            });
+            let url = urlTemplate
+                .replace(/{color}/g, color)
+                .replace(/{piece}/g, type);
 
             piece.style.backgroundImage = `url('${url}')`;
         }
@@ -1074,13 +1100,15 @@ function renderBoard() {
     var board = $('#chess-board');
     board.empty();
 
-    // Apply board background
+    // Apply board background with fallback size
     if (boardPiecesSettings.boardsData && boardPiecesSettings.selectedBoard) {
         var boardData = boardPiecesSettings.boardsData[boardPiecesSettings.selectedBoard];
         if (boardData) {
             var boardUrlTemplate = typeof boardData === 'object' ? boardData.url : boardData;
-            var boardUrl = boardUrlTemplate.replace('{size}', '600').replace('{}', '600');
+            var boardUrl = boardUrlTemplate.replace(/{size}/g, '300');
             board.css('backgroundImage', 'url(' + boardUrl + ')');
+            board.css('backgroundSize', 'cover');
+            board.css('backgroundPosition', 'center');
         }
     }
 
@@ -1130,14 +1158,9 @@ function renderBoard() {
                     var pieceUrlTemplate = typeof pieceData === 'object' ? pieceData.url : pieceData;
                     var color = pieceCode.charAt(0);
                     var type = pieceCode.charAt(1);
-                    var firstBrace = true;
-                    var pieceUrl = pieceUrlTemplate.replace(/{}/g, function() {
-                        if (firstBrace) {
-                            firstBrace = false;
-                            return color;
-                        }
-                        return type;
-                    });
+                    var pieceUrl = pieceUrlTemplate
+                        .replace(/{color}/g, color)
+                        .replace(/{piece}/g, type);
                     pieceEl.css('backgroundImage', 'url(' + pieceUrl + ')');
                 }
             }
@@ -1588,8 +1611,28 @@ function showTentativeMove(from, to, isPremove){
         $toSq.addClass('tentative-target');
         // clone piece into target as tentative-piece
         var cls = '';
-        $.each($piece.attr('class').split(/\s+/), function(i,c){ if (c.indexOf('piece-') === 0) cls = c; });
+        var pieceCode = '';
+        $.each($piece.attr('class').split(/\s+/), function(i,c){ if (c.indexOf('piece-') === 0) { cls = c; pieceCode = c.substring(6); } });
         var $clone = $('<div/>').addClass('chess-piece tentative-piece').addClass(cls);
+        // Apply custom piece image if available
+        if (boardPiecesSettings.piecesData && boardPiecesSettings.selectedPieces && pieceCode && pieceCode.length === 2) {
+            var pieceData = boardPiecesSettings.piecesData[boardPiecesSettings.selectedPieces];
+            if (pieceData) {
+                var pieceUrlTemplate = typeof pieceData === 'object' ? pieceData.url : pieceData;
+                var color = pieceCode.charAt(0);
+                var type = pieceCode.charAt(1);
+                var pieceUrl = pieceUrlTemplate
+                    .replace(/{color}/g, color)
+                    .replace(/{piece}/g, type);
+                $clone.css('backgroundImage', 'url(' + pieceUrl + ')');
+            }
+        } else {
+            // Fallback: copy the original piece's background image
+            var bgImage = $piece.css('backgroundImage');
+            if (bgImage) {
+                $clone.css('backgroundImage', bgImage);
+            }
+        }
         $toSq.append($clone);
     } catch(e){}
 }
