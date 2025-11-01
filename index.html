@@ -999,12 +999,14 @@ function applyBoardAndPieces() {
 
     if (!boardData || !pieceData) return;
 
-    // Update board background
+    // Update board background with fallback size
     const boardUrl = typeof boardData === 'object' ? boardData.url : boardData;
     const board = document.getElementById('chess-board');
     if (board) {
-        const imageSrc = boardUrl.replace(/{size}/g, '600');
+        const imageSrc = boardUrl.replace(/{size}/g, '300');
         board.style.backgroundImage = `url('${imageSrc}')`;
+        board.style.backgroundSize = 'cover';
+        board.style.backgroundPosition = 'center';
     }
 
     // Update piece images
