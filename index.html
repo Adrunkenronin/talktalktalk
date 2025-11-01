@@ -1724,6 +1724,11 @@ function ready() {
             if (stored && stored.id && ws && ws.readyState === 1) {
                 ws.send(JSON.stringify({ type: 'chess_resume_request', game_id: stored.id }));
                 flashStatus('Requesting to rejoin game...');
+            } else if (stored && stored.id) {
+                // Not connected yet: queue a pending rejoin and ensure WS connects
+                try { sessionStorage.setItem('pending_rejoin', String(stored.id)); } catch(e){}
+                flashStatus('Connecting... will attempt to rejoin when connection is ready.');
+                try { connectWS(); } catch(e){}
             } else {
                 flashStatus('Cannot rejoin right now. Ensure you are connected and your username matches the game owner.');
             }
