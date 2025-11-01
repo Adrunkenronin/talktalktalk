@@ -1338,6 +1338,16 @@ function ready() {
                         try { showRejoinPrompt(); } catch(_e){}
                     }
                 } catch(e){}
+                // If a rejoin was queued while offline, try to send it now
+                try {
+                    var pending = sessionStorage.getItem('pending_rejoin');
+                    if (pending) {
+                        ws.send(JSON.stringify({ type: 'chess_resume_request', game_id: Number(pending) }));
+                        try { sessionStorage.removeItem('pending_rejoin'); } catch(e){}
+                        flashStatus('Attempting queued rejoin...');
+                        try { showRejoinPrompt(); } catch(_e){}
+                    }
+                } catch(e){}
             }, 150);
             lastPong = Date.now();
             $('#popup').addClass('hidden'); $(':not(#popup)').removeClass('opaque');
