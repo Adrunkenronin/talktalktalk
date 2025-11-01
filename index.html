@@ -1611,12 +1611,27 @@ function showTentativeMove(from, to, isPremove){
         $toSq.addClass('tentative-target');
         // clone piece into target as tentative-piece
         var cls = '';
-        $.each($piece.attr('class').split(/\s+/), function(i,c){ if (c.indexOf('piece-') === 0) cls = c; });
+        var pieceCode = '';
+        $.each($piece.attr('class').split(/\s+/), function(i,c){ if (c.indexOf('piece-') === 0) { cls = c; pieceCode = c.substring(6); } });
         var $clone = $('<div/>').addClass('chess-piece tentative-piece').addClass(cls);
-        // Apply the same background image as the original piece
-        var bgImage = $piece.css('backgroundImage');
-        if (bgImage) {
-            $clone.css('backgroundImage', bgImage);
+        // Apply custom piece image if available
+        if (boardPiecesSettings.piecesData && boardPiecesSettings.selectedPieces && pieceCode && pieceCode.length === 2) {
+            var pieceData = boardPiecesSettings.piecesData[boardPiecesSettings.selectedPieces];
+            if (pieceData) {
+                var pieceUrlTemplate = typeof pieceData === 'object' ? pieceData.url : pieceData;
+                var color = pieceCode.charAt(0);
+                var type = pieceCode.charAt(1);
+                var pieceUrl = pieceUrlTemplate
+                    .replace(/{color}/g, color)
+                    .replace(/{piece}/g, type);
+                $clone.css('backgroundImage', 'url(' + pieceUrl + ')');
+            }
+        } else {
+            // Fallback: copy the original piece's background image
+            var bgImage = $piece.css('backgroundImage');
+            if (bgImage) {
+                $clone.css('backgroundImage', bgImage);
+            }
         }
         $toSq.append($clone);
     } catch(e){}
