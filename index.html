@@ -1613,6 +1613,11 @@ function showTentativeMove(from, to, isPremove){
         var cls = '';
         $.each($piece.attr('class').split(/\s+/), function(i,c){ if (c.indexOf('piece-') === 0) cls = c; });
         var $clone = $('<div/>').addClass('chess-piece tentative-piece').addClass(cls);
+        // Apply the same background image as the original piece
+        var bgImage = $piece.css('backgroundImage');
+        if (bgImage) {
+            $clone.css('backgroundImage', bgImage);
+        }
         $toSq.append($clone);
     } catch(e){}
 }
