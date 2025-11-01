@@ -79,6 +79,32 @@ app.get('/popsound.mp3', (req, res) => {
   res.sendFile(path.join(__dirname, 'popsound.mp3'));
 });
 
+// Serve board images with CDN fallback
+app.get('/boards/:boardName/:size.png', (req, res) => {
+  const { boardName, size } = req.params;
+  const localPath = path.join(__dirname, 'boards', boardName, `${size}.png`);
+
+  if (fs.existsSync(localPath)) {
+    res.sendFile(localPath);
+  } else {
+    const cdnUrl = `https://images.chesscomfiles.com/chess-themes/boards/${boardName}/${size}.png`;
+    res.redirect(cdnUrl);
+  }
+});
+
+// Serve piece images with CDN fallback
+app.get('/pieces/:pieceName/:color/:type.png', (req, res) => {
+  const { pieceName, color, type } = req.params;
+  const localPath = path.join(__dirname, 'pieces', pieceName, color, `${type}.png`);
+
+  if (fs.existsSync(localPath)) {
+    res.sendFile(localPath);
+  } else {
+    const cdnUrl = `https://images.chesscomfiles.com/chess-themes/pieces/${pieceName}/${color}/${type}.png`;
+    res.redirect(cdnUrl);
+  }
+});
+
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 

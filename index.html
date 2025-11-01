@@ -573,8 +573,8 @@ html {
 .piece-card:hover { border-color: var(--accent-primary); background: var(--accent-secondary); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
 .piece-card.selected { border-color: var(--accent-primary); background: var(--accent-secondary); font-weight: 600; box-shadow: 0 0 0 3px var(--accent-secondary); }
 .piece-card-name { font-size: 0.85rem; color: var(--text-primary); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.piece-preview { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
-.piece-preview-icon { width: 100%; aspect-ratio: 1; background: white; border-radius: var(--radius-sm); }
+.piece-preview { display: flex; justify-content: center; align-items: center; height: 90px; }
+.piece-preview-icon { width: 90px; height: 90px; background: white; border-radius: var(--radius-sm); }
 .chess-status { min-height: 1.5rem; color: var(--text-secondary); }
 .chess-actions { margin-top: auto; display: flex; gap: 0.5rem; }
 .chess-button { padding: 0.5rem 0.75rem; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: var(--bg-secondary); cursor: pointer; }
@@ -922,21 +922,20 @@ function initializeBoardPiecesModal() {
         }
 
         const urlTemplate = typeof pieceUrl === 'object' ? pieceUrl.url : pieceUrl;
-        const pieceCodesForPreview = ['wk', 'wq', 'wp', 'bk', 'bq', 'bp'];
-        const previewHTML = pieceCodesForPreview.map((fullCode) => {
-            const color = fullCode.charAt(0);
-            let finalUrl = urlTemplate;
-            let braceCount = 0;
-            finalUrl = finalUrl.replace(/{}/g, () => {
-                braceCount++;
-                if (braceCount === 1) {
-                    return color;
-                } else {
-                    return fullCode;
-                }
-            });
-            return `<img class="piece-preview-icon" src="${finalUrl}" alt="${fullCode}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22%3E%3Crect fill=%22%23eee%22 width=%2232%22 height=%2232%22/%3E%3C/svg%3E'" />`;
-        }).join('');
+        const knightCode = 'wn';
+        const color = knightCode.charAt(0);
+        const type = knightCode.charAt(1);
+        let knightUrl = urlTemplate;
+        let braceCount = 0;
+        knightUrl = knightUrl.replace(/{}/g, () => {
+            braceCount++;
+            if (braceCount === 1) {
+                return color;
+            } else {
+                return type;
+            }
+        });
+        const previewHTML = `<img class="piece-preview-icon" src="${knightUrl}" alt="knight" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2290%22 height=%2290%22%3E%3Crect fill=%22%23eee%22 width=%2290%22 height=%2290%22/%3E%3C/svg%3E'" />`;
 
         const cardHTML = `
             <div class="piece-preview">${previewHTML}</div>
@@ -988,9 +987,9 @@ function updateChessPieceImages(pieceData) {
 
     pieces.forEach(piece => {
         const pieceCode = piece.getAttribute('data-piece');
-        if (pieceCode && pieceCode.length === 3) {
+        if (pieceCode && pieceCode.length === 2) {
             const color = pieceCode.charAt(0);
-            const type = pieceCode.charAt(2);
+            const type = pieceCode.charAt(1);
 
             let url = urlTemplate;
             let firstBrace = true;
