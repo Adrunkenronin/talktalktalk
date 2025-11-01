@@ -1626,7 +1626,19 @@ function ready() {
             __chessUnread = 0; __updateTitleBadge();
             renderBoard();
             updateChessStatus();
+            return;
         }
+        // If we don't currently have chessGame populated (e.g. after reload), try to request resume
+        try {
+            var stored = null;
+            try { stored = JSON.parse(localStorage.getItem('active_game') || 'null'); } catch(e) { stored = null; }
+            if (stored && stored.id && ws && ws.readyState === 1) {
+                ws.send(JSON.stringify({ type: 'chess_resume_request', game_id: stored.id }));
+                flashStatus('Requesting to rejoin game...');
+            } else {
+                flashStatus('Cannot rejoin right now. Ensure you are connected and your username matches the game owner.');
+            }
+        } catch(e) { /* ignore */ }
     });
 
     function renderUserLists() {
