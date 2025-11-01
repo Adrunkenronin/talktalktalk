@@ -628,7 +628,18 @@ html {
   <div class="chess-layout">
     <div class="chess-board" id="chess-board"></div>
     <div class="chess-panel">
-      <h4>Chess</h4>
+      <div class="chess-panel-header">
+        <h4>Chess</h4>
+        <button class="chess-settings-btn" id="chess-settings-btn" title="Settings"><i class="fas fa-cog"></i></button>
+        <div class="chess-settings-dropdown hidden" id="chess-settings-dropdown">
+          <button class="chess-settings-toggle" data-setting="confirm-moves" title="Toggle confirm moves requirement">
+            <i class="fas fa-toggle-on"></i> Confirm moves
+          </button>
+          <button class="chess-settings-toggle" data-setting="premove" title="Toggle premove ability">
+            <i class="fas fa-toggle-on"></i> Premove
+          </button>
+        </div>
+      </div>
       <div class="history-controls" style="display:flex;gap:0.5rem;align-items:center;">
         <button class="chess-button" id="chess-prev" title="Previous move"><i class="fas fa-chevron-left"></i></button>
         <button class="chess-button" id="chess-next" title="Next move"><i class="fas fa-chevron-right"></i></button>
