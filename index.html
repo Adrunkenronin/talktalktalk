@@ -937,6 +937,20 @@ function applyBoardAndPieces() {
     updateChessPieceImages(pieceData);
 }
 
+function updateChessPieceImages(pieceData) {
+    const squares = document.querySelectorAll('.chess-square');
+    squares.forEach(square => {
+        const piece = square.getAttribute('data-piece');
+        if (piece) {
+            const pieceUrl = pieceData.url.replace('{size}', '60').replace('{piece}', piece);
+            const img = square.querySelector('.piece-img');
+            if (img) {
+                img.src = pieceUrl;
+            }
+        }
+    });
+}
+
 // Stockfish state
 var stockfishGame = null; // {fen, turn, color, engineColor, elo, over}
 var stockfishEngine = null;
