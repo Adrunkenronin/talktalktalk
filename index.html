@@ -1682,9 +1682,11 @@ function ready() {
             if (chessSettings.confirmMoves) {
                 $icon.removeClass('fa-toggle-off').addClass('fa-toggle-on');
                 $toggle.removeClass('disabled');
+                $('#chess-confirm-move').removeClass('hidden');
             } else {
                 $icon.removeClass('fa-toggle-on').addClass('fa-toggle-off');
                 $toggle.addClass('disabled');
+                $('#chess-confirm-move').addClass('hidden');
             }
         } else if (setting === 'premove') {
             if (chessSettings.premoveEnabled) {
