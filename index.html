@@ -1868,6 +1868,7 @@ function ready() {
         renderBoard();
         updateHistoryControls && updateHistoryControls();
         $('#chess-modal').removeClass('hidden');
+        updateSettingUI('confirm-moves');
     }
 
     // WebSocket message handler
