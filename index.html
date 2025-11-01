@@ -922,22 +922,20 @@ function initializeBoardPiecesModal() {
         }
 
         const urlTemplate = typeof pieceUrl === 'object' ? pieceUrl.url : pieceUrl;
-        const pieceCodesForPreview = ['wk', 'wq', 'wp', 'bk', 'bq', 'bp'];
-        const previewHTML = pieceCodesForPreview.map((fullCode) => {
-            const color = fullCode.charAt(0);
-            const type = fullCode.charAt(1);
-            let finalUrl = urlTemplate;
-            let braceCount = 0;
-            finalUrl = finalUrl.replace(/{}/g, () => {
-                braceCount++;
-                if (braceCount === 1) {
-                    return color;
-                } else {
-                    return type;
-                }
-            });
-            return `<img class="piece-preview-icon" src="${finalUrl}" alt="${fullCode}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22%3E%3Crect fill=%22%23eee%22 width=%2232%22 height=%2232%22/%3E%3C/svg%3E'" />`;
-        }).join('');
+        const knightCode = 'wn';
+        const color = knightCode.charAt(0);
+        const type = knightCode.charAt(1);
+        let knightUrl = urlTemplate;
+        let braceCount = 0;
+        knightUrl = knightUrl.replace(/{}/g, () => {
+            braceCount++;
+            if (braceCount === 1) {
+                return color;
+            } else {
+                return type;
+            }
+        });
+        const previewHTML = `<img class="piece-preview-icon" src="${knightUrl}" alt="knight" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2290%22 height=%2290%22%3E%3Crect fill=%22%23eee%22 width=%2290%22 height=%2290%22/%3E%3C/svg%3E'" />`;
 
         const cardHTML = `
             <div class="piece-preview">${previewHTML}</div>
