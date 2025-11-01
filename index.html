@@ -971,6 +971,13 @@ function clearPendingMove(){
 function stageMove(from, to, promotion){
     // Clear existing tentative visuals
     clearTentativeMoveVisuals();
+
+    // If confirm moves is disabled, send immediately
+    if (!chessSettings.confirmMoves) {
+        sendMove(from, to, promotion);
+        return;
+    }
+
     pendingUserMove = { from: from, to: to, promotion: promotion || null };
     $('#chess-board .chess-square').removeClass('selected');
     $('#chess-board .chess-square[data-square="' + from + '"]').addClass('selected');
