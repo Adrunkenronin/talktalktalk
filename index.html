@@ -285,6 +285,50 @@ html {
     margin-bottom: 0.75rem;
 }
 
+.top-right-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+    gap: 0.5rem;
+}
+
+.top-right-controls h3 {
+    margin: 0;
+    flex: 1;
+}
+
+.control-buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+}
+
+.control-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+    transition: color 0.2s ease, transform 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: var(--radius-md);
+    white-space: nowrap;
+}
+
+.control-btn:hover {
+    color: var(--accent-primary);
+    transform: scale(1.05);
+}
+
+.control-btn i {
+    font-size: 0.875rem;
+}
+
 #username { 
     padding: 0.5rem 0.75rem;
     background: var(--bg-tertiary);
