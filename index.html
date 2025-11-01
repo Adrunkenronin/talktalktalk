@@ -1018,6 +1018,16 @@ function renderBoard() {
     if (!chessGame) return;
     var board = $('#chess-board');
     board.empty();
+
+    // Apply board background
+    if (boardPiecesSettings.boardsData && boardPiecesSettings.selectedBoard) {
+        var boardData = boardPiecesSettings.boardsData[boardPiecesSettings.selectedBoard];
+        if (boardData) {
+            var boardUrl = boardData.url.replace('{size}', '600');
+            board.css('backgroundImage', 'url(' + boardUrl + ')');
+        }
+    }
+
     if (pendingPromotion) {
         hidePromotionDialog();
     } else {
