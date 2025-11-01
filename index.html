@@ -836,6 +836,107 @@ var __processingPremoves = false;
 // Chess settings
 var chessSettings = { confirmMoves: true, premoveEnabled: true };
 
+// Board and Pieces settings
+var boardPiecesSettings = {
+    selectedBoard: 'tan',
+    selectedPieces: 'classic',
+    boardsData: null,
+    piecesData: null
+};
+
+// Load boards and pieces data
+function loadBoardPiecesData() {
+    fetch('https://raw.githubusercontent.com/Adrunkenronin/chess.com-boards-and-pieces/master/data.json')
+        .then(response => response.json())
+        .then(data => {
+            boardPiecesSettings.boardsData = data.boards || {};
+            boardPiecesSettings.piecesData = data.pieces || {};
+            initializeBoardPiecesModal();
+        })
+        .catch(error => console.error('Failed to load board pieces data:', error));
+}
+
+function initializeBoardPiecesModal() {
+    if (!boardPiecesSettings.boardsData || !boardPiecesSettings.piecesData) return;
+
+    const boardsGrid = document.getElementById('boards-grid');
+    const piecesGrid = document.getElementById('pieces-grid');
+
+    // Create board cards
+    Object.entries(boardPiecesSettings.boardsData).forEach(([boardName, boardData]) => {
+        const card = document.createElement('div');
+        card.className = 'board-card';
+        if (boardName === boardPiecesSettings.selectedBoard) {
+            card.classList.add('selected');
+        }
+
+        const previewUrl = boardData.url.replace('{size}', '140');
+        const cardHTML = `
+            <img class="board-card-preview" src="${previewUrl}" alt="${boardName}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22140%22 height=%22140%22%3E%3Crect fill=%22%23ccc%22 width=%22140%22 height=%22140%22/%3E%3C/svg%3E'" />
+            <div class="board-card-name">${boardName.replace(/_/g, ' ')}</div>
+        `;
+        card.innerHTML = cardHTML;
+        card.addEventListener('click', () => selectBoard(boardName, card));
+        boardsGrid.appendChild(card);
+    });
+
+    // Create piece cards
+    Object.entries(boardPiecesSettings.piecesData).forEach(([pieceName, pieceData]) => {
+        const card = document.createElement('div');
+        card.className = 'piece-card';
+        if (pieceName === boardPiecesSettings.selectedPieces) {
+            card.classList.add('selected');
+        }
+
+        const pieceNames = ['wk', 'wq', 'wp', 'bk', 'bq', 'bp'];
+        const previewHTML = pieceNames.map(piece => {
+            const url = pieceData.url.replace('{size}', '32').replace('{piece}', piece);
+            return `<img class="piece-preview-icon" src="${url}" alt="${piece}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22%3E%3Crect fill=%22%23eee%22 width=%2232%22 height=%2232%22/%3E%3C/svg%3E'" />`;
+        }).join('');
+
+        const cardHTML = `
+            <div class="piece-preview">${previewHTML}</div>
+            <div class="piece-card-name">${pieceName.replace(/_/g, ' ')}</div>
+        `;
+        card.innerHTML = cardHTML;
+        card.addEventListener('click', () => selectPieces(pieceName, card));
+        piecesGrid.appendChild(card);
+    });
+}
+
+function selectBoard(boardName, cardElement) {
+    document.querySelectorAll('.board-card').forEach(card => card.classList.remove('selected'));
+    cardElement.classList.add('selected');
+    boardPiecesSettings.selectedBoard = boardName;
+    applyBoardAndPieces();
+}
+
+function selectPieces(pieceName, cardElement) {
+    document.querySelectorAll('.piece-card').forEach(card => card.classList.remove('selected'));
+    cardElement.classList.add('selected');
+    boardPiecesSettings.selectedPieces = pieceName;
+    applyBoardAndPieces();
+}
+
+function applyBoardAndPieces() {
+    if (!boardPiecesSettings.boardsData || !boardPiecesSettings.piecesData) return;
+
+    const boardData = boardPiecesSettings.boardsData[boardPiecesSettings.selectedBoard];
+    const pieceData = boardPiecesSettings.piecesData[boardPiecesSettings.selectedPieces];
+
+    if (!boardData || !pieceData) return;
+
+    // Update board background
+    const boardUrl = boardData.url.replace('{size}', '600');
+    const board = document.getElementById('chess-board');
+    if (board) {
+        board.style.backgroundImage = `url('${boardUrl}')`;
+    }
+
+    // Update piece images
+    updateChessPieceImages(pieceData);
+}
+
 // Stockfish state
 var stockfishGame = null; // {fen, turn, color, engineColor, elo, over}
 var stockfishEngine = null;
