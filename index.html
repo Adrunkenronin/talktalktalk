@@ -968,15 +968,26 @@ function applyBoardAndPieces() {
 }
 
 function updateChessPieceImages(pieceData) {
-    const squares = document.querySelectorAll('.chess-square');
-    squares.forEach(square => {
-        const piece = square.getAttribute('data-piece');
-        if (piece) {
-            const pieceUrl = pieceData.url.replace('{size}', '60').replace('{piece}', piece);
-            const img = square.querySelector('.piece-img');
-            if (img) {
-                img.src = pieceUrl;
-            }
+    const pieces = document.querySelectorAll('.chess-piece');
+    const urlTemplate = typeof pieceData === 'object' ? pieceData.url : pieceData;
+
+    pieces.forEach(piece => {
+        const pieceCode = piece.getAttribute('data-piece');
+        if (pieceCode && pieceCode.length === 3) {
+            const color = pieceCode.charAt(0);
+            const type = pieceCode.charAt(2);
+
+            let url = urlTemplate;
+            let firstBrace = true;
+            url = url.replace(/{}/g, () => {
+                if (firstBrace) {
+                    firstBrace = false;
+                    return color;
+                }
+                return type;
+            });
+
+            piece.style.backgroundImage = `url('${url}')`;
         }
     });
 }
