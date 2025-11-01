@@ -911,9 +911,10 @@ function initializeBoardPiecesModal() {
         const piecePreviewPairs = [['w', 'k'], ['w', 'q'], ['w', 'p'], ['b', 'k'], ['b', 'q'], ['b', 'p']];
         const previewHTML = piecePreviewPairs.map(([color, piece]) => {
             const urlTemplate = typeof pieceUrl === 'object' ? pieceUrl.url : pieceUrl;
-            const url = urlTemplate.replace('{size}', '32').replace('{}', color).replace('{}', piece).replace('/{}/{}.png', `/${color}/${color}${piece}.png`);
-            const finalUrl = url.includes('{') ? urlTemplate.replace('/{}/{}.png', `/${color}/${color}${piece}.png`) : url;
-            return `<img class="piece-preview-icon" src="${finalUrl}" alt="${color}${piece}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22%3E%3Crect fill=%22%23eee%22 width=%2232%22 height=%2232%22/%3E%3C/svg%3E'" />`;
+            const url = urlTemplate.replace(/{}/g, (match, offset) => {
+                return urlTemplate.indexOf('{}') === offset ? color : piece;
+            });
+            return `<img class="piece-preview-icon" src="${url}" alt="${color}${piece}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22%3E%3Crect fill=%22%23eee%22 width=%2232%22 height=%2232%22/%3E%3C/svg%3E'" />`;
         }).join('');
 
         const cardHTML = `
