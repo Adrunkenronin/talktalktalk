@@ -925,6 +925,7 @@ function initializeBoardPiecesModal() {
         const pieceCodesForPreview = ['wk', 'wq', 'wp', 'bk', 'bq', 'bp'];
         const previewHTML = pieceCodesForPreview.map((fullCode) => {
             const color = fullCode.charAt(0);
+            const type = fullCode.charAt(1);
             let finalUrl = urlTemplate;
             let braceCount = 0;
             finalUrl = finalUrl.replace(/{}/g, () => {
@@ -932,7 +933,7 @@ function initializeBoardPiecesModal() {
                 if (braceCount === 1) {
                     return color;
                 } else {
-                    return fullCode;
+                    return type;
                 }
             });
             return `<img class="piece-preview-icon" src="${finalUrl}" alt="${fullCode}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22%3E%3Crect fill=%22%23eee%22 width=%2232%22 height=%2232%22/%3E%3C/svg%3E'" />`;
