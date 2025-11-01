@@ -1116,14 +1116,8 @@ function renderBoard() {
                     var pieceUrlTemplate = typeof pieceData === 'object' ? pieceData.url : pieceData;
                     var color = pieceCode.charAt(0);
                     var type = pieceCode.charAt(1);
-                    var pieceUrl = pieceUrlTemplate.replace(/{}/g, function(match) {
-                        if (pieceUrl.indexOf(match) === pieceUrlTemplate.indexOf('{}')) {
-                            return color;
-                        }
-                        return type;
-                    });
                     var firstBrace = true;
-                    pieceUrl = pieceUrlTemplate.replace(/{}/g, function() {
+                    var pieceUrl = pieceUrlTemplate.replace(/{}/g, function() {
                         if (firstBrace) {
                             firstBrace = false;
                             return color;
