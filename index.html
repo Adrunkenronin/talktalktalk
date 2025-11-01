@@ -1131,7 +1131,23 @@ function onSquareClick() {
         $(this).addClass('selected');
         return;
     }
-    attemptMove(selectedSquare, sq);
+
+    // If confirm moves is disabled and it's our turn, send immediately
+    if (!chessSettings.confirmMoves && myTurn) {
+        // Check if move requires promotion first
+        var from = selectedSquare;
+        var to = sq;
+        var piece = squarePieceCode(from);
+        if (piece && requiresPromotion(piece, to)) {
+            // Still need to show promotion dialog
+            attemptMove(from, to);
+        } else {
+            // Send immediately without confirming
+            sendMove(from, to);
+        }
+    } else {
+        attemptMove(selectedSquare, sq);
+    }
 }
 
 function onPieceDragStart(e) {
