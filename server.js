@@ -723,6 +723,17 @@ wss.on('connection', (ws, req) => {
       }
       sendUserList();
       deliverQueuedInvites(username);
+
+      // Notify user of any active chess game to allow rejoin after reload/disconnect
+      try {
+        for (const [gid, g] of games.entries()) {
+          if (!g.over && (g.white === username || g.black === username)) {
+            const turn = (g.board && typeof g.board.turn === 'function' && g.board.turn() === 'w') ? 'white' : 'black';
+            send(ws, { type: 'chess_resume', game_id: gid, white: g.white, black: g.black, fen: (g.board && typeof g.board.fen === 'function' ? g.board.fen() : ''), turn });
+            break;
+          }
+        }
+      } catch (e) {}
     }
     else if (msg.type === 'forget_me') {
       const uname = users.get(ws);
