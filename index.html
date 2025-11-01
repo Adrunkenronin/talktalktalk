@@ -1066,6 +1066,16 @@ function renderBoard() {
         var pieceCode = chessGame.squareMap[sq];
         if (pieceCode) {
             var pieceEl = $('<div/>').addClass('chess-piece').addClass('piece-' + pieceCode).attr('draggable', true).attr('data-square', sq).attr('data-piece', pieceCode);
+
+            // Apply custom piece image if available
+            if (boardPiecesSettings.piecesData && boardPiecesSettings.selectedPieces) {
+                var pieceData = boardPiecesSettings.piecesData[boardPiecesSettings.selectedPieces];
+                if (pieceData) {
+                    var pieceUrl = pieceData.url.replace('{size}', '60').replace('{piece}', pieceCode);
+                    pieceEl.css('backgroundImage', 'url(' + pieceUrl + ')');
+                }
+            }
+
             el.append(pieceEl);
         }
         var histEntry = (chessGame.moveHistory && typeof chessGame.historyIndex !== 'undefined') ? chessGame.moveHistory[chessGame.historyIndex] : null;
