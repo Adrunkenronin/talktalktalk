@@ -573,8 +573,8 @@ html {
 .piece-card:hover { border-color: var(--accent-primary); background: var(--accent-secondary); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
 .piece-card.selected { border-color: var(--accent-primary); background: var(--accent-secondary); font-weight: 600; box-shadow: 0 0 0 3px var(--accent-secondary); }
 .piece-card-name { font-size: 0.85rem; color: var(--text-primary); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.piece-preview { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
-.piece-preview-icon { width: 100%; aspect-ratio: 1; background: white; border-radius: var(--radius-sm); }
+.piece-preview { display: flex; justify-content: center; align-items: center; height: 90px; }
+.piece-preview-icon { width: 90px; height: 90px; background: white; border-radius: var(--radius-sm); }
 .chess-status { min-height: 1.5rem; color: var(--text-secondary); }
 .chess-actions { margin-top: auto; display: flex; gap: 0.5rem; }
 .chess-button { padding: 0.5rem 0.75rem; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: var(--bg-secondary); cursor: pointer; }
