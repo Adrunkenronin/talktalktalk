@@ -915,8 +915,7 @@ function initializeBoardPiecesModal() {
             const nameSpan = document.createElement('span');
             nameSpan.style.fontSize = '0.85rem';
             nameSpan.style.color = 'var(--text-secondary)';
-            nameSpan.style.textAlign = 'center';
-            nameSpan.style.gridColumn = '1 / -1';
+            nameSpan.style.display = 'block';
             nameSpan.textContent = displayName;
             card.appendChild(nameSpan);
         };
