@@ -1089,6 +1089,11 @@ function attemptMove(from, to) {
         if (myTurn) {
             stageMove(from, to, null);
         } else {
+            if (!chessSettings.premoveEnabled) {
+                flashStatus('Premove disabled');
+                clearSelection();
+                return;
+            }
             enqueuePremove(from, to, null);
         }
     }
