@@ -2016,6 +2016,23 @@ function ready() {
         }
     });
 
+    // Board and Pieces tab switching
+    $('.board-pieces-tab').on('click', function() {
+        var tabName = $(this).data('tab');
+
+        // Update active tab button
+        $('.board-pieces-tab').removeClass('active');
+        $(this).addClass('active');
+
+        // Update active section
+        $('.board-pieces-section').removeClass('active');
+        if (tabName === 'boards') {
+            $('#boards-section').addClass('active');
+        } else if (tabName === 'pieces') {
+            $('#pieces-section').addClass('active');
+        }
+    });
+
     // Chess modal controls
     $('#chess-close').on('click', function(){
         $('#chess-modal').addClass('hidden');
