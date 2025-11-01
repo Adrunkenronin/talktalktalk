@@ -905,11 +905,28 @@ function initializeBoardPiecesModal() {
         const previewUrl = typeof boardUrl === 'object' ? boardUrl.url : boardUrl;
         const imageSrc = previewUrl.replace('{size}', '140').replace('{}', '140');
         const displayName = boardName.replace(/_/g, ' ');
-        const cardHTML = `
-            <img class="board-card-preview" src="${imageSrc}" alt="${displayName}" onerror="this.style.display='none';this.parentElement.innerHTML+='<span style=\\"font-size:0.85rem;color:var(--text-secondary);text-align:center;\\">${displayName}</span>'" />
-            <div class="board-card-name">${displayName}</div>
-        `;
-        card.innerHTML = cardHTML;
+
+        const img = document.createElement('img');
+        img.className = 'board-card-preview';
+        img.alt = displayName;
+        img.src = imageSrc;
+        img.onerror = function() {
+            img.style.display = 'none';
+            const nameSpan = document.createElement('span');
+            nameSpan.style.fontSize = '0.85rem';
+            nameSpan.style.color = 'var(--text-secondary)';
+            nameSpan.style.textAlign = 'center';
+            nameSpan.style.gridColumn = '1 / -1';
+            nameSpan.textContent = displayName;
+            card.appendChild(nameSpan);
+        };
+
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'board-card-name';
+        nameDiv.textContent = displayName;
+
+        card.appendChild(img);
+        card.appendChild(nameDiv);
         card.addEventListener('click', () => selectBoard(boardName, card));
         boardsGrid.appendChild(card);
     });
