@@ -727,6 +727,29 @@ html {
     </div>
   </div>
 </div>
+
+<!-- Board and Pieces Selection Modal -->
+<div id="board-pieces-modal" class="hidden board-pieces-modal">
+  <div class="board-pieces-panel">
+    <div class="board-pieces-header">
+      <h2>Board and Pieces</h2>
+      <button class="board-pieces-close" id="board-pieces-close" title="Close">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="board-pieces-content">
+      <div class="board-pieces-section">
+        <h3>Boards</h3>
+        <div class="boards-grid" id="boards-grid"></div>
+      </div>
+      <div class="board-pieces-section">
+        <h3>Pieces</h3>
+        <div class="pieces-grid" id="pieces-grid"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script type="text/javascript">
 var popsound = new Audio('popsound.mp3');
 popsound.muted = true; // Mute initially to comply with browser autoplay policies
