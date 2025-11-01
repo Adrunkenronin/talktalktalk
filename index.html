@@ -767,13 +767,15 @@ html {
         <i class="fas fa-times"></i>
       </button>
     </div>
+    <div class="board-pieces-tabs">
+      <button class="board-pieces-tab active" data-tab="boards">Boards</button>
+      <button class="board-pieces-tab" data-tab="pieces">Pieces</button>
+    </div>
     <div class="board-pieces-content">
-      <div class="board-pieces-section">
-        <h3>Boards</h3>
+      <div class="board-pieces-section active" id="boards-section">
         <div class="boards-grid" id="boards-grid"></div>
       </div>
-      <div class="board-pieces-section">
-        <h3>Pieces</h3>
+      <div class="board-pieces-section" id="pieces-section">
         <div class="pieces-grid" id="pieces-grid"></div>
       </div>
     </div>
