@@ -1154,14 +1154,9 @@ function renderBoard() {
                     var pieceUrlTemplate = typeof pieceData === 'object' ? pieceData.url : pieceData;
                     var color = pieceCode.charAt(0);
                     var type = pieceCode.charAt(1);
-                    var firstBrace = true;
-                    var pieceUrl = pieceUrlTemplate.replace(/{}/g, function() {
-                        if (firstBrace) {
-                            firstBrace = false;
-                            return color;
-                        }
-                        return type;
-                    });
+                    var pieceUrl = pieceUrlTemplate
+                        .replace(/{color}/g, color)
+                        .replace(/{piece}/g, type);
                     pieceEl.css('backgroundImage', 'url(' + pieceUrl + ')');
                 }
             }
