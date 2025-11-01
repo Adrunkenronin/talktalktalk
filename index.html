@@ -1103,7 +1103,7 @@ function renderBoard() {
         var boardData = boardPiecesSettings.boardsData[boardPiecesSettings.selectedBoard];
         if (boardData) {
             var boardUrlTemplate = typeof boardData === 'object' ? boardData.url : boardData;
-            var boardUrl = boardUrlTemplate.replace('{size}', '600').replace('{}', '600');
+            var boardUrl = boardUrlTemplate.replace(/{size}/g, '600');
             board.css('backgroundImage', 'url(' + boardUrl + ')');
         }
     }
