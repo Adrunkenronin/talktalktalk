@@ -574,9 +574,26 @@ html {
 <button id="sidebar-toggle" aria-label="Open sidebar" title="Menu"><i class="fas fa-users"></i></button>
 
 <div id="right">
-    <h3>ZYBERCOMMS</h3>
-    
-    
+    <div class="top-right-controls">
+        <h3>ZYBERCOMMS</h3>
+        <div class="control-buttons">
+            <button class="control-btn" id="board-pieces-btn" title="Board and Pieces">
+                <i class="fas fa-chess"></i> Board & Pieces
+            </button>
+            <button class="control-btn chess-settings-btn" id="chess-settings-btn" title="Settings">
+                <i class="fas fa-cog"></i>
+            </button>
+            <div class="chess-settings-dropdown hidden" id="chess-settings-dropdown">
+                <button class="chess-settings-toggle" data-setting="confirm-moves" title="Toggle confirm moves requirement">
+                    <i class="fas fa-toggle-on"></i> Confirm moves
+                </button>
+                <button class="chess-settings-toggle" data-setting="premove" title="Toggle premove ability">
+                    <i class="fas fa-toggle-on"></i> Premove
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div>
         <h3>Username</h3>
         <span id="username" class="dashed">user</span>
