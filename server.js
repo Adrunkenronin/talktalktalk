@@ -732,6 +732,37 @@ wss.on('connection', (ws, req) => {
         sendUserList();
       }
     }
+    else if (msg.type === 'chess_resume_request') {
+      const gid = msg.game_id;
+      try {
+        console.log('[resume_request] from', users.get(ws), 'requested gid', gid);
+        if (gid && games.has(gid)) {
+          const g = games.get(gid);
+          if (!g.over) {
+            const turn = g.board.turn() === 'w' ? 'white' : 'black';
+            send(ws, { type: 'chess_resume', game_id: gid, white: g.white, black: g.black, fen: g.board.fen(), turn: turn });
+            console.log('[resume] sent for gid', gid, 'to', users.get(ws));
+          } else {
+            send(ws, { type: 'chess_error', message: 'Game over' });
+          }
+        } else {
+          // fallback: find any active game for this user (if username known)
+          const username = users.get(ws);
+          if (username) {
+            for (const [gid2, g] of games.entries()) {
+              if (!g.over && (g.white === username || g.black === username)) {
+                const turn = g.board.turn() === 'w' ? 'white' : 'black';
+                send(ws, { type: 'chess_resume', game_id: gid2, white: g.white, black: g.black, fen: g.board.fen(), turn: turn });
+                console.log('[resume] sent for gid', gid2, 'to', username);
+                break;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[resume_request] error', err);
+      }
+    }
     else if (msg.type === 'chess_invite') {
       const inviter = users.get(ws);
       const target = String(msg.to || '');
