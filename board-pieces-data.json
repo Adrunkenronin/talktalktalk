@@ -17,7 +17,7 @@
         "wr"
     ],
     "pieces": {
-        "3d_chesskid": "/pieces/3d_chesskid/{}/{}.png",
+        "3d_chesskid": "https://images.chesscomfiles.com/chess-themes/pieces/3d_chesskid/{}/{}.png",
         "3d_plastic": "/pieces/3d_plastic/{}/{}.png",
         "3d_staunton": "/pieces/3d_staunton/{}/{}.png",
         "3d_wood": "/pieces/3d_wood/{}/{}.png",
