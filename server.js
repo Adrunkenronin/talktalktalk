@@ -743,6 +743,30 @@ wss.on('connection', (ws, req) => {
         sendUserList();
       }
     }
+    else if (msg.type === 'chess_resume_request') {
+      const gid = Number(msg.game_id);
+      try {
+        if (!isNaN(gid) && games.has(gid)) {
+          const g = games.get(gid);
+          if (!g.over) {
+            const turn = (g.board && typeof g.board.turn === 'function' && g.board.turn() === 'w') ? 'white' : 'black';
+            send(ws, { type: 'chess_resume', game_id: gid, white: g.white, black: g.black, fen: (g.board && typeof g.board.fen === 'function' ? g.board.fen() : ''), turn });
+          }
+        } else {
+          // fallback: find any active game for this user (if username known)
+          const username = users.get(ws);
+          if (username) {
+            for (const [gid2, g] of games.entries()) {
+              if (!g.over && (g.white === username || g.black === username)) {
+                const turn = (g.board && typeof g.board.turn === 'function' && g.board.turn() === 'w') ? 'white' : 'black';
+                send(ws, { type: 'chess_resume', game_id: gid2, white: g.white, black: g.black, fen: (g.board && typeof g.board.fen === 'function' ? g.board.fen() : ''), turn });
+                break;
+              }
+            }
+          }
+        }
+      } catch (e) {}
+    }
     else if (msg.type === 'chess_invite') {
       const inviter = users.get(ws);
       const target = String(msg.to || '');
