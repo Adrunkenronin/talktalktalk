@@ -1064,7 +1064,8 @@ function renderBoard() {
     if (boardPiecesSettings.boardsData && boardPiecesSettings.selectedBoard) {
         var boardData = boardPiecesSettings.boardsData[boardPiecesSettings.selectedBoard];
         if (boardData) {
-            var boardUrl = boardData.url.replace('{size}', '600');
+            var boardUrlTemplate = typeof boardData === 'object' ? boardData.url : boardData;
+            var boardUrl = boardUrlTemplate.replace('{size}', '600').replace('{}', '600');
             board.css('backgroundImage', 'url(' + boardUrl + ')');
         }
     }
@@ -1112,7 +1113,23 @@ function renderBoard() {
             if (boardPiecesSettings.piecesData && boardPiecesSettings.selectedPieces) {
                 var pieceData = boardPiecesSettings.piecesData[boardPiecesSettings.selectedPieces];
                 if (pieceData) {
-                    var pieceUrl = pieceData.url.replace('{size}', '60').replace('{piece}', pieceCode);
+                    var pieceUrlTemplate = typeof pieceData === 'object' ? pieceData.url : pieceData;
+                    var color = pieceCode.charAt(0);
+                    var type = pieceCode.charAt(1);
+                    var pieceUrl = pieceUrlTemplate.replace(/{}/g, function(match) {
+                        if (pieceUrl.indexOf(match) === pieceUrlTemplate.indexOf('{}')) {
+                            return color;
+                        }
+                        return type;
+                    });
+                    var firstBrace = true;
+                    pieceUrl = pieceUrlTemplate.replace(/{}/g, function() {
+                        if (firstBrace) {
+                            firstBrace = false;
+                            return color;
+                        }
+                        return type;
+                    });
                     pieceEl.css('backgroundImage', 'url(' + pieceUrl + ')');
                 }
             }
