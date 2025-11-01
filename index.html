@@ -956,10 +956,11 @@ function applyBoardAndPieces() {
     if (!boardData || !pieceData) return;
 
     // Update board background
-    const boardUrl = boardData.url.replace('{size}', '600');
+    const boardUrl = typeof boardData === 'object' ? boardData.url : boardData;
     const board = document.getElementById('chess-board');
     if (board) {
-        board.style.backgroundImage = `url('${boardUrl}')`;
+        const imageSrc = boardUrl.replace('{size}', '600').replace('{}', '600');
+        board.style.backgroundImage = `url('${imageSrc}')`;
     }
 
     // Update piece images
