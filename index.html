@@ -989,9 +989,9 @@ function updateChessPieceImages(pieceData) {
 
     pieces.forEach(piece => {
         const pieceCode = piece.getAttribute('data-piece');
-        if (pieceCode && pieceCode.length === 3) {
+        if (pieceCode && pieceCode.length === 2) {
             const color = pieceCode.charAt(0);
-            const type = pieceCode.charAt(2);
+            const type = pieceCode.charAt(1);
 
             let url = urlTemplate;
             let firstBrace = true;
