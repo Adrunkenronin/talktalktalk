@@ -1199,7 +1199,11 @@ function onPromotionChoice() {
     hidePromotionDialog();
     if (!details || !promotion) return;
     if (details.mode === 'premove') {
-        enqueuePremove(details.from, details.to, promotion);
+        if (chessSettings.premoveEnabled) {
+            enqueuePremove(details.from, details.to, promotion);
+        } else {
+            flashStatus('Premove disabled');
+        }
     } else {
         stageMove(details.from, details.to, promotion);
     }
