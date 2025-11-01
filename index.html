@@ -1890,7 +1890,7 @@ function ready() {
 
     // Close settings dropdown when clicking outside
     $(document).on('click', function(e) {
-        if (!$(e.target).closest('#chess-settings-btn, #chess-settings-dropdown').length) {
+        if (!$(e.target).closest('#chess-settings-btn, #chess-settings-dropdown, .control-buttons').length) {
             $('#chess-settings-dropdown').addClass('hidden');
         }
     });
