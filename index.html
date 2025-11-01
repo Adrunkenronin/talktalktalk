@@ -522,10 +522,10 @@ html {
 #chess-modal { z-index: 1000; position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 95vw; max-width: 720px; background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 1rem; }
 .chess-layout { display: grid; grid-template-columns: 1fr 240px; gap: 1rem; }
 .chess-board { width: 100%; aspect-ratio: 1 / 1; display: grid; grid-template-columns: repeat(8, 1fr); border: 1px solid var(--border-light); border-radius: var(--radius-lg); overflow: hidden; }
-.chess-square { display: flex; align-items: center; justify-content: center; user-select: none; cursor: pointer; position: relative; background-size: cover; background-position: center; }
-:root { --chess-light: #eeeed2; --chess-dark: #769656; }
-.chess-square.light { background-color: var(--chess-light); }
-.chess-square.dark { background-color: var(--chess-dark); }
+.chess-square { display: flex; align-items: center; justify-content: center; user-select: none; cursor: pointer; position: relative; background-color: transparent; }
+:root { --chess-light: #eeeed2; --chess-dark: #769656; --board-bg-light: rgba(238, 238, 210, 0.6); --board-bg-dark: rgba(118, 150, 86, 0.6); }
+.chess-square.light { background-color: var(--board-bg-light); }
+.chess-square.dark { background-color: var(--board-bg-dark); }
 .chess-square.selected { outline: 3px solid var(--accent-primary); outline-offset: -3px; }
 .chess-square.lastmove { box-shadow: inset 0 0 0 3px rgba(246, 223, 99, 0.45); }
 .chess-square.drag-over { outline: 3px solid var(--accent-primary); outline-offset: -3px; }
