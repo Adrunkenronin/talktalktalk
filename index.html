@@ -885,10 +885,22 @@ function loadBoardPiecesData() {
 }
 
 function initializeBoardPiecesModal() {
-    if (!boardPiecesSettings.boardsData || !boardPiecesSettings.piecesData) return;
+    if (!boardPiecesSettings.boardsData || !boardPiecesSettings.piecesData) {
+        console.warn('Board and pieces data not loaded');
+        return;
+    }
 
     const boardsGrid = document.getElementById('boards-grid');
     const piecesGrid = document.getElementById('pieces-grid');
+
+    if (!boardsGrid || !piecesGrid) {
+        console.error('Grid elements not found in DOM');
+        return;
+    }
+
+    // Clear existing cards
+    boardsGrid.innerHTML = '';
+    piecesGrid.innerHTML = '';
 
     // Create board cards
     Object.entries(boardPiecesSettings.boardsData).forEach(([boardName, boardData]) => {
