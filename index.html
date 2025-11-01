@@ -935,11 +935,12 @@ function initializeBoardPiecesModal() {
                 return type;
             }
         });
-        const previewHTML = `<img class="piece-preview-icon" src="${knightUrl}" alt="knight" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2290%22 height=%2290%22%3E%3Crect fill=%22%23eee%22 width=%2290%22 height=%2290%22/%3E%3C/svg%3E'" />`;
+        const displayName = pieceName.replace(/_/g, ' ');
+        const previewHTML = `<img class="piece-preview-icon" src="${knightUrl}" alt="${displayName}" onerror="this.style.display='none';this.parentElement.innerHTML+='<span style=\\"font-size:0.85rem;color:var(--text-secondary);text-align:center;\\">${displayName}</span>'" />`;
 
         const cardHTML = `
             <div class="piece-preview">${previewHTML}</div>
-            <div class="piece-card-name">${pieceName.replace(/_/g, ' ')}</div>
+            <div class="piece-card-name">${displayName}</div>
         `;
         card.innerHTML = cardHTML;
         card.addEventListener('click', () => selectPieces(pieceName, card));
