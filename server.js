@@ -749,6 +749,16 @@ wss.on('connection', (ws, req) => {
       }
       sendUserList();
       deliverQueuedInvites(username);
+
+      // Check if player can rejoin any active games
+      for (const [gid, g] of games.entries()) {
+        if (!g.over && (username === g.white || username === g.black)) {
+          const turn = g.board.turn() === 'w' ? 'white' : 'black';
+          const payload = { type: 'chess_start', game_id: gid, white: g.white, black: g.black, fen: g.board.fen(), turn: turn };
+          send(ws, payload);
+          break; // Only rejoin one game
+        }
+      }
     }
     else if (msg.type === 'forget_me') {
       const uname = users.get(ws);
