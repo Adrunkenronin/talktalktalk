@@ -2152,9 +2152,10 @@ function ready() {
         } else {
             document.documentElement.classList.remove('dark-mode');
         }
-        try {
-            localStorage.setItem('darkMode', isDark ? 'true' : 'false');
-        } catch(e) {}
+        var username = $('#username').text();
+        if (username) {
+            saveUserSetting('darkMode', isDark ? 'true' : 'false', username);
+        }
     }
 
     // Board and Pieces modal handlers
