@@ -1824,6 +1824,15 @@ function ready() {
         connectWS();
     }
 
+    // Load dark mode preference
+    try {
+        var darkModePref = localStorage.getItem('darkMode');
+        if (darkModePref === 'true') {
+            chessSettings.darkMode = true;
+            applyDarkMode(true);
+        }
+    } catch(e) {}
+
     $('#previous').click(function(e) {
         if (ws && ws.readyState === 1) ws.send(JSON.stringify({'type': 'messagesbefore', 'id': firstId}));
         e.preventDefault();
