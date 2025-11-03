@@ -2007,6 +2007,7 @@ function ready() {
             usr = randomname;
         $('#username').text(usr);
         setStoredUsername(usr);
+        loadUserSettings(usr);
         $('#usernameinput').hide();
         $('#username').show();
         if (ws && ws.readyState === 1) ws.send(JSON.stringify({ "type" : "username", "username" : usr }));
