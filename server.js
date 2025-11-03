@@ -72,7 +72,7 @@ app.use(function(req, res, next) {
 });
 
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'talktalktalk.html'));
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.get('/popsound.mp3', (req, res) => {
