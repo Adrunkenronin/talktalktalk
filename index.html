@@ -906,25 +906,48 @@ function initializeBoardPiecesModal() {
         const imageSrc = previewUrl.replace(/{size}/g, '140');
         const displayName = boardName.replace(/_/g, ' ');
 
+        const previewContainer = document.createElement('div');
+        previewContainer.style.width = '100%';
+        previewContainer.style.height = '90px';
+        previewContainer.style.background = 'white';
+        previewContainer.style.borderRadius = 'var(--radius-sm)';
+        previewContainer.style.display = 'flex';
+        previewContainer.style.alignItems = 'center';
+        previewContainer.style.justifyContent = 'center';
+        previewContainer.style.flexShrink = '0';
+
         const img = document.createElement('img');
         img.className = 'board-card-preview';
         img.alt = displayName;
         img.src = imageSrc;
-        img.onerror = function() {
-            img.style.display = 'none';
-            const nameSpan = document.createElement('span');
-            nameSpan.style.fontSize = '0.85rem';
-            nameSpan.style.color = 'var(--text-secondary)';
-            nameSpan.style.display = 'block';
-            nameSpan.textContent = displayName;
-            card.appendChild(nameSpan);
+        img.style.width = '100%';
+        img.style.height = '100%';
+        img.style.objectFit = 'cover';
+        img.style.borderRadius = 'var(--radius-sm)';
+
+        let imageLoaded = false;
+        img.onload = function() {
+            imageLoaded = true;
         };
+
+        img.onerror = function() {
+            if (!imageLoaded) {
+                previewContainer.innerHTML = '';
+                const fallbackIcon = document.createElement('div');
+                fallbackIcon.style.fontSize = '2rem';
+                fallbackIcon.style.color = 'var(--text-muted)';
+                fallbackIcon.innerHTML = '♟';
+                previewContainer.appendChild(fallbackIcon);
+            }
+        };
+
+        previewContainer.appendChild(img);
 
         const nameDiv = document.createElement('div');
         nameDiv.className = 'board-card-name';
         nameDiv.textContent = displayName;
 
-        card.appendChild(img);
+        card.appendChild(previewContainer);
         card.appendChild(nameDiv);
         card.addEventListener('click', () => selectBoard(boardName, card));
         boardsGrid.appendChild(card);
