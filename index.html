@@ -1021,6 +1021,10 @@ function selectBoard(boardName, cardElement) {
     document.querySelectorAll('.board-card').forEach(card => card.classList.remove('selected'));
     cardElement.classList.add('selected');
     boardPiecesSettings.selectedBoard = boardName;
+    var username = $('#username').text();
+    if (username) {
+        saveUserSetting('selectedBoard', boardName, username);
+    }
     applyBoardAndPieces();
 }
 
@@ -1028,6 +1032,10 @@ function selectPieces(pieceName, cardElement) {
     document.querySelectorAll('.piece-card').forEach(card => card.classList.remove('selected'));
     cardElement.classList.add('selected');
     boardPiecesSettings.selectedPieces = pieceName;
+    var username = $('#username').text();
+    if (username) {
+        saveUserSetting('selectedPieces', pieceName, username);
+    }
     applyBoardAndPieces();
 }
 
