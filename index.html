@@ -2056,6 +2056,10 @@ function ready() {
             if (!chessSettings.premoveEnabled) {
                 clearAllPremoves();
             }
+        } else if (setting === 'dark-mode') {
+            chessSettings.darkMode = !chessSettings.darkMode;
+            updateSettingUI('dark-mode');
+            applyDarkMode(chessSettings.darkMode);
         }
     });
 
