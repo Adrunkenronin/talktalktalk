@@ -2095,6 +2095,17 @@ function ready() {
         }
     }
 
+    function applyDarkMode(isDark) {
+        if (isDark) {
+            document.documentElement.classList.add('dark-mode');
+        } else {
+            document.documentElement.classList.remove('dark-mode');
+        }
+        try {
+            localStorage.setItem('darkMode', isDark ? 'true' : 'false');
+        } catch(e) {}
+    }
+
     // Board and Pieces modal handlers
     $('#board-pieces-btn').on('click', function(e) {
         e.stopPropagation();
