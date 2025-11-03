@@ -2040,6 +2040,9 @@ function ready() {
     $('#chess-settings-btn').on('click', function(e) {
         e.stopPropagation();
         $('#chess-settings-dropdown').toggleClass('hidden');
+        if (!$('#chess-settings-dropdown').hasClass('hidden')) {
+            updateSettingUI('dark-mode');
+        }
     });
 
     // Close settings dropdown when clicking outside
