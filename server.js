@@ -836,6 +836,22 @@ wss.on('connection', (ws, req) => {
         }
       }
     }
+    else if (msg.type === 'chess_resume_request') {
+      const gid = msg.game_id;
+      const player = users.get(ws);
+      if (games.has(gid)) {
+        const g = games.get(gid);
+        if (!g.over && (player === g.white || player === g.black)) {
+          const turn = g.board.turn() === 'w' ? 'white' : 'black';
+          const payload = { type: 'chess_start', game_id: gid, white: g.white, black: g.black, fen: g.board.fen(), turn: turn };
+          send(ws, payload);
+        } else {
+          send(ws, { type: 'chess_error', message: 'Cannot rejoin game' });
+        }
+      } else {
+        send(ws, { type: 'chess_error', message: 'Game not found' });
+      }
+    }
   });
 
   ws.on('close', () => {
