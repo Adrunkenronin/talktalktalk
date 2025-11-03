@@ -26,7 +26,10 @@
         "sand": "boards/sand/{size}.png",
         "sky": "boards/sky/{size}.png",
         "stone": "boards/stone/{size}.png",
-        "tan": "boards/tan/{size}.png"
+        "tan": "boards/tan/{size}.png",
+        "tournament": "boards/tournament/{size}.png",
+        "translucent": "boards/translucent/{size}.png",
+        "walnut": "boards/walnut/{size}.png"
     },
     "pieces": {
         "3d_chesskid": "pieces/3d_chesskid/{color}{piece}.png",
