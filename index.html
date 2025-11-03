@@ -1734,6 +1734,45 @@ function ready() {
         try { localStorage.setItem("username", val); } catch (e) { window._fallbackUsername = val; }
     }
 
+    function getSettingKey(setting, username) {
+        return setting + '_' + username;
+    }
+
+    function loadUserSettings(username) {
+        try {
+            var darkModePref = localStorage.getItem(getSettingKey('darkMode', username));
+            if (darkModePref === 'true') {
+                chessSettings.darkMode = true;
+                applyDarkMode(true);
+            } else {
+                chessSettings.darkMode = false;
+                applyDarkMode(false);
+            }
+
+            var savedBoard = localStorage.getItem(getSettingKey('selectedBoard', username));
+            if (savedBoard) {
+                boardPiecesSettings.selectedBoard = savedBoard;
+            } else {
+                boardPiecesSettings.selectedBoard = 'tan';
+            }
+
+            var savedPieces = localStorage.getItem(getSettingKey('selectedPieces', username));
+            if (savedPieces) {
+                boardPiecesSettings.selectedPieces = savedPieces;
+            } else {
+                boardPiecesSettings.selectedPieces = 'classic';
+            }
+
+            applyBoardAndPieces();
+        } catch(e) {}
+    }
+
+    function saveUserSetting(setting, value, username) {
+        try {
+            localStorage.setItem(getSettingKey(setting, username), value);
+        } catch(e) {}
+    }
+
     function connectWS() {
         if (ws && (ws.readyState === 0 || ws.readyState === 1)) return;
         var storedWs = (function(){ try { return localStorage.getItem('WS_URL'); } catch(e){ return null; } })();
