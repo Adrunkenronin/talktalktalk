@@ -2189,7 +2189,11 @@ function ready() {
         $('#chess-settings-dropdown').addClass('hidden');
         $('#board-pieces-modal').removeClass('hidden');
         if (!boardPiecesSettings.boardsData) {
-            loadBoardPiecesData();
+            loadBoardPiecesData().then(function() {
+                ensureBoardPiecesModalInitialized();
+            });
+        } else {
+            ensureBoardPiecesModalInitialized();
         }
     });
 
