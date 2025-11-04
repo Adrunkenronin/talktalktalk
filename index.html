@@ -859,7 +859,7 @@ var boardPiecesSettings = {
 
 // Load boards and pieces data from local file
 function loadBoardPiecesData() {
-    fetch('board-pieces-data.json?t=' + Date.now())
+    return fetch('board-pieces-data.json?t=' + Date.now())
         .then(response => response.json())
         .then(data => {
             boardPiecesSettings.boardsData = data.boards || {};
