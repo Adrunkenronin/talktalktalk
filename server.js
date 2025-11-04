@@ -57,8 +57,36 @@ function persistKnownUsers() {
   try { fs.writeFile(USERS_FILE, JSON.stringify(Array.from(knownUsers)), () => {}); } catch(_) {}
 }
 
+function loadUserSettings() {
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+      if (typeof data === 'object' && data !== null) {
+        userSettings = data;
+      }
+    }
+  } catch (_) {}
+}
+
+function persistUserSettings() {
+  try { fs.writeFile(SETTINGS_FILE, JSON.stringify(userSettings, null, 2), () => {}); } catch(_) {}
+}
+
+function getUserSettings(username) {
+  if (!username) return null;
+  return userSettings[username] || null;
+}
+
+function saveUserSettings(username, settings) {
+  if (!username || typeof settings !== 'object') return false;
+  userSettings[username] = settings;
+  persistUserSettings();
+  return true;
+}
+
 loadMessages();
 loadKnownUsers();
+loadUserSettings();
 
 // Server
 const app = express();
