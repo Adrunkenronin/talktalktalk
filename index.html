@@ -881,11 +881,16 @@ function loadBoardPiecesData() {
         .then(data => {
             boardPiecesSettings.boardsData = data.boards || {};
             boardPiecesSettings.piecesData = data.pieces || {};
-            initializeBoardPiecesModal();
         })
         .catch(error => {
             console.error('Failed to load board pieces data:', error);
         });
+}
+
+function ensureBoardPiecesModalInitialized() {
+    if (boardPiecesSettings.boardsData && boardPiecesSettings.piecesData) {
+        initializeBoardPiecesModal();
+    }
 }
 
 function initializeBoardPiecesModal() {
