@@ -2168,6 +2168,10 @@ function ready() {
             if (!chessSettings.premoveEnabled) {
                 clearAllPremoves();
             }
+        } else if (setting === 'dark-mode') {
+            chessSettings.darkMode = !chessSettings.darkMode;
+            applyDarkMode(chessSettings.darkMode);
+            updateSettingUI('dark-mode');
         }
         saveUserSettings($('#username').text());
     });
