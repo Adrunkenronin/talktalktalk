@@ -2125,30 +2125,6 @@ function ready() {
         saveUserSettings($('#username').text());
     });
 
-    function updateSettingUI(setting) {
-        var $toggle = $('#chess-settings-dropdown').find('[data-setting="' + setting + '"]');
-        var $icon = $toggle.find('i');
-        if (setting === 'confirm-moves') {
-            if (chessSettings.confirmMoves) {
-                $icon.removeClass('fa-toggle-off').addClass('fa-toggle-on');
-                $toggle.removeClass('disabled');
-                $('#chess-confirm-move').removeClass('hidden');
-            } else {
-                $icon.removeClass('fa-toggle-on').addClass('fa-toggle-off');
-                $toggle.addClass('disabled');
-                $('#chess-confirm-move').addClass('hidden');
-            }
-        } else if (setting === 'premove') {
-            if (chessSettings.premoveEnabled) {
-                $icon.removeClass('fa-toggle-off').addClass('fa-toggle-on');
-                $toggle.removeClass('disabled');
-            } else {
-                $icon.removeClass('fa-toggle-on').addClass('fa-toggle-off');
-                $toggle.addClass('disabled');
-            }
-        }
-    }
-
     // Board and Pieces modal handlers
     $('#board-pieces-btn').on('click', function(e) {
         e.stopPropagation();
