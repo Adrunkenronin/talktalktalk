@@ -138,6 +138,33 @@ app.get('/pieces/:pieceName/:color/:type.png', (req, res) => {
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+// User Settings API endpoints
+app.get('/api/settings/:username', (req, res) => {
+  const username = String(req.params.username || '').trim();
+  if (!username) {
+    return res.status(400).json({ error: 'username required' });
+  }
+  const settings = getUserSettings(username);
+  if (settings) {
+    return res.json(settings);
+  } else {
+    return res.json(null);
+  }
+});
+
+app.post('/api/settings/:username', (req, res) => {
+  const username = String(req.params.username || '').trim();
+  if (!username) {
+    return res.status(400).json({ error: 'username required' });
+  }
+  const settings = req.body;
+  if (typeof settings !== 'object' || settings === null) {
+    return res.status(400).json({ error: 'settings must be an object' });
+  }
+  saveUserSettings(username, settings);
+  return res.json({ success: true });
+});
+
 // Stockfish WASM module is unreliable on server-side, using fallback algorithm instead
 let StockfishFactory = null;
 
