@@ -1890,6 +1890,14 @@ function ready() {
                 $icon.removeClass('fa-toggle-on').addClass('fa-toggle-off');
                 $toggle.addClass('disabled');
             }
+        } else if (setting === 'dark-mode') {
+            if (chessSettings.darkMode) {
+                $icon.removeClass('fa-toggle-off').addClass('fa-toggle-on');
+                $toggle.removeClass('disabled');
+            } else {
+                $icon.removeClass('fa-toggle-on').addClass('fa-toggle-off');
+                $toggle.addClass('disabled');
+            }
         }
     }
 
