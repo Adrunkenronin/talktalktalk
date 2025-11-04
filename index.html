@@ -1077,9 +1077,11 @@ function loadUserSettings(username) {
                     boardPiecesSettings.selectedPieces = data.selectedPieces;
                 }
                 if (boardPiecesSettings.boardsData && boardPiecesSettings.piecesData) {
+                    ensureBoardPiecesModalInitialized();
                     applyBoardAndPieces();
                 } else {
                     loadBoardPiecesData().then(function() {
+                        ensureBoardPiecesModalInitialized();
                         applyBoardAndPieces();
                     });
                 }
