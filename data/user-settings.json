@@ -2,7 +2,8 @@
   "zahir": {
     "confirmMoves": true,
     "premoveEnabled": true,
-    "selectedBoard": "burled_wood",
+    "darkMode": true,
+    "selectedBoard": "tan",
     "selectedPieces": "classic"
   }
 }
