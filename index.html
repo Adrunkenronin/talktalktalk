@@ -1040,7 +1040,13 @@ function loadUserSettings(username) {
                 if (typeof data.selectedPieces === 'string') {
                     boardPiecesSettings.selectedPieces = data.selectedPieces;
                 }
-                applyBoardAndPieces();
+                if (boardPiecesSettings.boardsData && boardPiecesSettings.piecesData) {
+                    applyBoardAndPieces();
+                } else {
+                    loadBoardPiecesData().then(function() {
+                        applyBoardAndPieces();
+                    });
+                }
             }
         })
         .catch(function(error) {
