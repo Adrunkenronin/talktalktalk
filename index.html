@@ -1775,6 +1775,52 @@ function ready() {
         }, 5000);
     }
 
+    function loadUserSettings(username) {
+        var apiUrl = API_BASE + '/api/settings/' + encodeURIComponent(username);
+        fetch(apiUrl)
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                if (data && typeof data === 'object') {
+                    if (typeof data.confirmMoves === 'boolean') {
+                        chessSettings.confirmMoves = data.confirmMoves;
+                        updateSettingUI('confirm-moves');
+                    }
+                    if (typeof data.premoveEnabled === 'boolean') {
+                        chessSettings.premoveEnabled = data.premoveEnabled;
+                        updateSettingUI('premove');
+                    }
+                    if (typeof data.selectedBoard === 'string') {
+                        boardPiecesSettings.selectedBoard = data.selectedBoard;
+                    }
+                    if (typeof data.selectedPieces === 'string') {
+                        boardPiecesSettings.selectedPieces = data.selectedPieces;
+                    }
+                    applyBoardAndPieces();
+                }
+            })
+            .catch(function(error) {
+                console.warn('Failed to load user settings:', error);
+            });
+    }
+
+    function saveUserSettings(username) {
+        var apiUrl = API_BASE + '/api/settings/' + encodeURIComponent(username);
+        var settings = {
+            confirmMoves: chessSettings.confirmMoves,
+            premoveEnabled: chessSettings.premoveEnabled,
+            selectedBoard: boardPiecesSettings.selectedBoard,
+            selectedPieces: boardPiecesSettings.selectedPieces
+        };
+        fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        })
+        .catch(function(error) {
+            console.warn('Failed to save user settings:', error);
+        });
+    }
+
     function showFirstLoginModal() {
         var $overlay = $('#first-login');
         var $input = $('#first-username-input');
@@ -1794,6 +1840,7 @@ function ready() {
             setStoredUsername(val);
             $overlay.addClass('hidden').removeClass('show');
             $('body > *:not(#first-login)').removeClass('opaque');
+            loadUserSettings(val);
             connectWS();
         });
         setTimeout(function(){ $input.focus(); updateBtn(); }, 0);
