@@ -1017,6 +1017,14 @@ function initializeBoardPiecesModal() {
     });
 }
 
+function applyDarkMode(isDark) {
+    if (isDark) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+    }
+}
+
 function saveUserSettings(username) {
     if (!username) return;
     var apiUrl = API_BASE + '/api/settings/' + encodeURIComponent(username);
