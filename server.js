@@ -18,11 +18,13 @@ const ADMINHIDDENNAME = 'adminxyz';
 const DATA_DIR = path.join(__dirname, 'data');
 const MSG_FILE = path.join(DATA_DIR, 'messages.jsonl');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const SETTINGS_FILE = path.join(DATA_DIR, 'user-settings.json');
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
 let idx = 0; // next message id
 let messages = []; // array of message objects {type:'message', message, username, id, datetime}
 let knownUsers = new Set(); // all-time seen users (current canonical usernames)
+let userSettings = {}; // username -> {confirmMoves, premoveEnabled, selectedBoard, selectedPieces}
 
 function loadMessages() {
   if (!fs.existsSync(MSG_FILE)) return;
