@@ -1052,6 +1052,11 @@ function loadUserSettings(username) {
                     chessSettings.premoveEnabled = data.premoveEnabled;
                     updateSettingUI('premove');
                 }
+                if (typeof data.darkMode === 'boolean') {
+                    chessSettings.darkMode = data.darkMode;
+                    applyDarkMode(data.darkMode);
+                    updateSettingUI('dark-mode');
+                }
                 if (typeof data.selectedBoard === 'string') {
                     boardPiecesSettings.selectedBoard = data.selectedBoard;
                 }
