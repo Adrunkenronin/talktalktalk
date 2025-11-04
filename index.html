@@ -1005,6 +1005,10 @@ function selectBoard(boardName, cardElement) {
     cardElement.classList.add('selected');
     boardPiecesSettings.selectedBoard = boardName;
     applyBoardAndPieces();
+    var username = document.getElementById('username').textContent;
+    if (username && username !== 'user') {
+        saveUserSettings(username);
+    }
 }
 
 function selectPieces(pieceName, cardElement) {
@@ -1012,6 +1016,10 @@ function selectPieces(pieceName, cardElement) {
     cardElement.classList.add('selected');
     boardPiecesSettings.selectedPieces = pieceName;
     applyBoardAndPieces();
+    var username = document.getElementById('username').textContent;
+    if (username && username !== 'user') {
+        saveUserSettings(username);
+    }
 }
 
 function applyBoardAndPieces() {
