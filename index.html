@@ -1735,9 +1735,9 @@ function ready() {
         var wsUrl = wsOverride ? wsOverride : (wsScheme + '://' + location.host + '/ws');
         ws = new WebSocket(wsUrl);
         ws.onmessage = handleWsMessage;
-          
-        $(window).on('beforeunload', function() { 
-            if (ws) ws.close(); 
+
+        $(window).on('beforeunload', function() {
+            if (ws) ws.close();
         });
 
         ws.onopen = function() {
@@ -1754,7 +1754,7 @@ function ready() {
             }, 150);
             lastPong = Date.now();
             $('#popup').addClass('hidden'); $(':not(#popup)').removeClass('opaque');
-            $('#writing').focus();  
+            $('#writing').focus();
             updateSendButton(); // Initialize send button state
             scroll_end();
             setTimeout(function() { scroll_end(); }, 200);  // useful on touch devices, when keyboard opens
@@ -1765,7 +1765,7 @@ function ready() {
                 if (!__logoutRequested && ws.readyState != 0 && ws.readyState != 1)
                     popup_message('Click anywhere or press any key to reload the page.', false, true);
              }, 2000);
-        };    
+        };
 
         loop = setInterval(function() {
             if (!ws || ws.readyState !== 1) return;
@@ -1781,6 +1781,31 @@ function ready() {
                 }, 1000);
             }
         }, 5000);
+    }
+
+    function updateSettingUI(setting) {
+        if (!document.getElementById('chess-settings-dropdown')) return;
+        var $toggle = $('#chess-settings-dropdown').find('[data-setting="' + setting + '"]');
+        var $icon = $toggle.find('i');
+        if (setting === 'confirm-moves') {
+            if (chessSettings.confirmMoves) {
+                $icon.removeClass('fa-toggle-off').addClass('fa-toggle-on');
+                $toggle.removeClass('disabled');
+                $('#chess-confirm-move').removeClass('hidden');
+            } else {
+                $icon.removeClass('fa-toggle-on').addClass('fa-toggle-off');
+                $toggle.addClass('disabled');
+                $('#chess-confirm-move').addClass('hidden');
+            }
+        } else if (setting === 'premove') {
+            if (chessSettings.premoveEnabled) {
+                $icon.removeClass('fa-toggle-off').addClass('fa-toggle-on');
+                $toggle.removeClass('disabled');
+            } else {
+                $icon.removeClass('fa-toggle-on').addClass('fa-toggle-off');
+                $toggle.addClass('disabled');
+            }
+        }
     }
 
     function loadUserSettings(username) {
