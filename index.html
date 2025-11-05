@@ -58,9 +58,23 @@ try {
     --radius-xl: 1rem;
 }
 
-* { 
-    margin: 0; 
-    padding: 0; 
+html[data-theme="dark"] {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-tertiary: #334155;
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-muted: #64748b;
+    --accent-primary: #60a5fa;
+    --accent-secondary: #1e3a8a;
+    --accent-hover: #93c5fd;
+    --border-light: #334155;
+    --border-medium: #475569;
+}
+
+* {
+    margin: 0;
+    padding: 0;
     box-sizing: border-box;
 }
 
@@ -665,6 +679,9 @@ html {
                 <button class="chess-settings-toggle" data-setting="premove" title="Toggle premove ability">
                     <i class="fas fa-toggle-on"></i> Premove
                 </button>
+                <button class="chess-settings-toggle" data-setting="dark-mode" title="Toggle dark mode">
+                    <i class="fas fa-toggle-on"></i> Dark mode
+                </button>
                 <div class="chess-settings-divider"></div>
                 <button class="chess-settings-button" id="board-pieces-btn" title="Board and Pieces">
                     <i class="fas fa-chess"></i> Board & Pieces
@@ -847,7 +864,7 @@ var currentTentative = null; // {from,to,isPremove}
 // Guards to prevent re-entrant premove processing and concurrent engine fetches
 var __processingPremoves = false;
 // Chess settings
-var chessSettings = { confirmMoves: true, premoveEnabled: true };
+var chessSettings = { confirmMoves: true, premoveEnabled: true, darkMode: false };
 
 // Board and Pieces settings
 var boardPiecesSettings = {
@@ -859,16 +876,21 @@ var boardPiecesSettings = {
 
 // Load boards and pieces data from local file
 function loadBoardPiecesData() {
-    fetch('board-pieces-data.json?t=' + Date.now())
+    return fetch('board-pieces-data.json?t=' + Date.now())
         .then(response => response.json())
         .then(data => {
             boardPiecesSettings.boardsData = data.boards || {};
             boardPiecesSettings.piecesData = data.pieces || {};
-            initializeBoardPiecesModal();
         })
         .catch(error => {
             console.error('Failed to load board pieces data:', error);
         });
+}
+
+function ensureBoardPiecesModalInitialized() {
+    if (boardPiecesSettings.boardsData && boardPiecesSettings.piecesData) {
+        initializeBoardPiecesModal();
+    }
 }
 
 function initializeBoardPiecesModal() {
@@ -1000,11 +1022,126 @@ function initializeBoardPiecesModal() {
     });
 }
 
+function applyDarkMode(isDark) {
+    if (isDark) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+    }
+}
+
+function updateSettingUI(setting) {
+    if (!document.getElementById('chess-settings-dropdown')) return;
+    var $toggle = $('#chess-settings-dropdown').find('[data-setting="' + setting + '"]');
+    var $icon = $toggle.find('i');
+    if (setting === 'confirm-moves') {
+        if (chessSettings.confirmMoves) {
+            $icon.removeClass('fa-toggle-off').addClass('fa-toggle-on');
+            $toggle.removeClass('disabled');
+            $('#chess-confirm-move').removeClass('hidden');
+        } else {
+            $icon.removeClass('fa-toggle-on').addClass('fa-toggle-off');
+            $toggle.addClass('disabled');
+            $('#chess-confirm-move').addClass('hidden');
+        }
+    } else if (setting === 'premove') {
+        if (chessSettings.premoveEnabled) {
+            $icon.removeClass('fa-toggle-off').addClass('fa-toggle-on');
+            $toggle.removeClass('disabled');
+        } else {
+            $icon.removeClass('fa-toggle-on').addClass('fa-toggle-off');
+            $toggle.addClass('disabled');
+        }
+    } else if (setting === 'dark-mode') {
+        if (chessSettings.darkMode) {
+            $icon.removeClass('fa-toggle-off').addClass('fa-toggle-on');
+            $toggle.removeClass('disabled');
+        } else {
+            $icon.removeClass('fa-toggle-on').addClass('fa-toggle-off');
+            $toggle.addClass('disabled');
+        }
+    }
+}
+
+function saveUserSettings(username) {
+    if (!username || username === 'user') return;
+    var apiUrl = API_BASE + '/api/settings/' + encodeURIComponent(username);
+    var settings = {
+        confirmMoves: chessSettings.confirmMoves,
+        premoveEnabled: chessSettings.premoveEnabled,
+        darkMode: chessSettings.darkMode,
+        selectedBoard: boardPiecesSettings.selectedBoard,
+        selectedPieces: boardPiecesSettings.selectedPieces
+    };
+    console.log('Saving settings for user:', username, settings);
+    fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+    })
+    .then(function(response) {
+        console.log('Settings saved successfully for', username);
+    })
+    .catch(function(error) {
+        console.warn('Failed to save user settings:', error);
+    });
+}
+
+function loadUserSettings(username) {
+    if (!username || username === 'user') return;
+    var apiUrl = API_BASE + '/api/settings/' + encodeURIComponent(username);
+    console.log('Loading settings for user:', username);
+    fetch(apiUrl)
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            console.log('Loaded settings data for', username, ':', data);
+            if (data && typeof data === 'object') {
+                if (typeof data.confirmMoves === 'boolean') {
+                    chessSettings.confirmMoves = data.confirmMoves;
+                    updateSettingUI('confirm-moves');
+                }
+                if (typeof data.premoveEnabled === 'boolean') {
+                    chessSettings.premoveEnabled = data.premoveEnabled;
+                    updateSettingUI('premove');
+                }
+                if (typeof data.darkMode === 'boolean') {
+                    chessSettings.darkMode = data.darkMode;
+                    applyDarkMode(data.darkMode);
+                    updateSettingUI('dark-mode');
+                }
+                if (typeof data.selectedBoard === 'string') {
+                    console.log('Setting board to:', data.selectedBoard);
+                    boardPiecesSettings.selectedBoard = data.selectedBoard;
+                }
+                if (typeof data.selectedPieces === 'string') {
+                    console.log('Setting pieces to:', data.selectedPieces);
+                    boardPiecesSettings.selectedPieces = data.selectedPieces;
+                }
+                if (boardPiecesSettings.boardsData && boardPiecesSettings.piecesData) {
+                    ensureBoardPiecesModalInitialized();
+                    applyBoardAndPieces();
+                } else {
+                    loadBoardPiecesData().then(function() {
+                        ensureBoardPiecesModalInitialized();
+                        applyBoardAndPieces();
+                    });
+                }
+            }
+        })
+        .catch(function(error) {
+            console.warn('Failed to load user settings:', error);
+        });
+}
+
 function selectBoard(boardName, cardElement) {
     document.querySelectorAll('.board-card').forEach(card => card.classList.remove('selected'));
     cardElement.classList.add('selected');
     boardPiecesSettings.selectedBoard = boardName;
     applyBoardAndPieces();
+    var username = $('#username').text().trim();
+    if (username && username !== 'user') {
+        saveUserSettings(username);
+    }
 }
 
 function selectPieces(pieceName, cardElement) {
@@ -1012,6 +1149,10 @@ function selectPieces(pieceName, cardElement) {
     cardElement.classList.add('selected');
     boardPiecesSettings.selectedPieces = pieceName;
     applyBoardAndPieces();
+    var username = $('#username').text().trim();
+    if (username && username !== 'user') {
+        saveUserSettings(username);
+    }
 }
 
 function applyBoardAndPieces() {
@@ -1727,9 +1868,9 @@ function ready() {
         var wsUrl = wsOverride ? wsOverride : (wsScheme + '://' + location.host + '/ws');
         ws = new WebSocket(wsUrl);
         ws.onmessage = handleWsMessage;
-          
-        $(window).on('beforeunload', function() { 
-            if (ws) ws.close(); 
+
+        $(window).on('beforeunload', function() {
+            if (ws) ws.close();
         });
 
         ws.onopen = function() {
@@ -1746,7 +1887,7 @@ function ready() {
             }, 150);
             lastPong = Date.now();
             $('#popup').addClass('hidden'); $(':not(#popup)').removeClass('opaque');
-            $('#writing').focus();  
+            $('#writing').focus();
             updateSendButton(); // Initialize send button state
             scroll_end();
             setTimeout(function() { scroll_end(); }, 200);  // useful on touch devices, when keyboard opens
@@ -1757,7 +1898,7 @@ function ready() {
                 if (!__logoutRequested && ws.readyState != 0 && ws.readyState != 1)
                     popup_message('Click anywhere or press any key to reload the page.', false, true);
              }, 2000);
-        };    
+        };
 
         loop = setInterval(function() {
             if (!ws || ws.readyState !== 1) return;
@@ -1794,6 +1935,7 @@ function ready() {
             setStoredUsername(val);
             $overlay.addClass('hidden').removeClass('show');
             $('body > *:not(#first-login)').removeClass('opaque');
+            loadUserSettings(val);
             connectWS();
         });
         setTimeout(function(){ $input.focus(); updateBtn(); }, 0);
@@ -1804,6 +1946,7 @@ function ready() {
         showFirstLoginModal();
     } else {
         $('#username').text(storedName);
+        loadUserSettings(storedName);
         connectWS();
     }
 
@@ -1943,6 +2086,7 @@ function ready() {
         setStoredUsername(usr);
         $('#usernameinput').hide();
         $('#username').show();
+        loadUserSettings(usr);
         if (ws && ws.readyState === 1) ws.send(JSON.stringify({ "type" : "username", "username" : usr }));
         e.preventDefault();
     });
@@ -2039,32 +2183,16 @@ function ready() {
             if (!chessSettings.premoveEnabled) {
                 clearAllPremoves();
             }
+        } else if (setting === 'dark-mode') {
+            chessSettings.darkMode = !chessSettings.darkMode;
+            applyDarkMode(chessSettings.darkMode);
+            updateSettingUI('dark-mode');
+        }
+        var username = $('#username').text().trim();
+        if (username && username !== 'user') {
+            saveUserSettings(username);
         }
     });
-
-    function updateSettingUI(setting) {
-        var $toggle = $('#chess-settings-dropdown').find('[data-setting="' + setting + '"]');
-        var $icon = $toggle.find('i');
-        if (setting === 'confirm-moves') {
-            if (chessSettings.confirmMoves) {
-                $icon.removeClass('fa-toggle-off').addClass('fa-toggle-on');
-                $toggle.removeClass('disabled');
-                $('#chess-confirm-move').removeClass('hidden');
-            } else {
-                $icon.removeClass('fa-toggle-on').addClass('fa-toggle-off');
-                $toggle.addClass('disabled');
-                $('#chess-confirm-move').addClass('hidden');
-            }
-        } else if (setting === 'premove') {
-            if (chessSettings.premoveEnabled) {
-                $icon.removeClass('fa-toggle-off').addClass('fa-toggle-on');
-                $toggle.removeClass('disabled');
-            } else {
-                $icon.removeClass('fa-toggle-on').addClass('fa-toggle-off');
-                $toggle.addClass('disabled');
-            }
-        }
-    }
 
     // Board and Pieces modal handlers
     $('#board-pieces-btn').on('click', function(e) {
@@ -2072,7 +2200,11 @@ function ready() {
         $('#chess-settings-dropdown').addClass('hidden');
         $('#board-pieces-modal').removeClass('hidden');
         if (!boardPiecesSettings.boardsData) {
-            loadBoardPiecesData();
+            loadBoardPiecesData().then(function() {
+                ensureBoardPiecesModalInitialized();
+            });
+        } else {
+            ensureBoardPiecesModalInitialized();
         }
     });
 

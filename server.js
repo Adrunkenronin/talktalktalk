@@ -18,11 +18,13 @@ const ADMINHIDDENNAME = 'adminxyz';
 const DATA_DIR = path.join(__dirname, 'data');
 const MSG_FILE = path.join(DATA_DIR, 'messages.jsonl');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const SETTINGS_FILE = path.join(DATA_DIR, 'user-settings.json');
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
 let idx = 0; // next message id
 let messages = []; // array of message objects {type:'message', message, username, id, datetime}
 let knownUsers = new Set(); // all-time seen users (current canonical usernames)
+let userSettings = {}; // username -> {confirmMoves, premoveEnabled, selectedBoard, selectedPieces}
 
 function loadMessages() {
   if (!fs.existsSync(MSG_FILE)) return;
@@ -55,8 +57,36 @@ function persistKnownUsers() {
   try { fs.writeFile(USERS_FILE, JSON.stringify(Array.from(knownUsers)), () => {}); } catch(_) {}
 }
 
+function loadUserSettings() {
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+      if (typeof data === 'object' && data !== null) {
+        userSettings = data;
+      }
+    }
+  } catch (_) {}
+}
+
+function persistUserSettings() {
+  try { fs.writeFile(SETTINGS_FILE, JSON.stringify(userSettings, null, 2), () => {}); } catch(_) {}
+}
+
+function getUserSettings(username) {
+  if (!username) return null;
+  return userSettings[username] || null;
+}
+
+function saveUserSettings(username, settings) {
+  if (!username || typeof settings !== 'object') return false;
+  userSettings[username] = settings;
+  persistUserSettings();
+  return true;
+}
+
 loadMessages();
 loadKnownUsers();
+loadUserSettings();
 
 // Server
 const app = express();
@@ -107,6 +137,33 @@ app.get('/pieces/:pieceName/:color/:type.png', (req, res) => {
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
+
+// User Settings API endpoints
+app.get('/api/settings/:username', (req, res) => {
+  const username = String(req.params.username || '').trim();
+  if (!username) {
+    return res.status(400).json({ error: 'username required' });
+  }
+  const settings = getUserSettings(username);
+  if (settings) {
+    return res.json(settings);
+  } else {
+    return res.json(null);
+  }
+});
+
+app.post('/api/settings/:username', (req, res) => {
+  const username = String(req.params.username || '').trim();
+  if (!username) {
+    return res.status(400).json({ error: 'username required' });
+  }
+  const settings = req.body;
+  if (typeof settings !== 'object' || settings === null) {
+    return res.status(400).json({ error: 'settings must be an object' });
+  }
+  saveUserSettings(username, settings);
+  return res.json({ success: true });
+});
 
 // Stockfish WASM module is unreliable on server-side, using fallback algorithm instead
 let StockfishFactory = null;
