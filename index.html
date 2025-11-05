@@ -1916,39 +1916,6 @@ function ready() {
         }, 5000);
     }
 
-    function updateSettingUI(setting) {
-        if (!document.getElementById('chess-settings-dropdown')) return;
-        var $toggle = $('#chess-settings-dropdown').find('[data-setting="' + setting + '"]');
-        var $icon = $toggle.find('i');
-        if (setting === 'confirm-moves') {
-            if (chessSettings.confirmMoves) {
-                $icon.removeClass('fa-toggle-off').addClass('fa-toggle-on');
-                $toggle.removeClass('disabled');
-                $('#chess-confirm-move').removeClass('hidden');
-            } else {
-                $icon.removeClass('fa-toggle-on').addClass('fa-toggle-off');
-                $toggle.addClass('disabled');
-                $('#chess-confirm-move').addClass('hidden');
-            }
-        } else if (setting === 'premove') {
-            if (chessSettings.premoveEnabled) {
-                $icon.removeClass('fa-toggle-off').addClass('fa-toggle-on');
-                $toggle.removeClass('disabled');
-            } else {
-                $icon.removeClass('fa-toggle-on').addClass('fa-toggle-off');
-                $toggle.addClass('disabled');
-            }
-        } else if (setting === 'dark-mode') {
-            if (chessSettings.darkMode) {
-                $icon.removeClass('fa-toggle-off').addClass('fa-toggle-on');
-                $toggle.removeClass('disabled');
-            } else {
-                $icon.removeClass('fa-toggle-on').addClass('fa-toggle-off');
-                $toggle.addClass('disabled');
-            }
-        }
-    }
-
     function showFirstLoginModal() {
         var $overlay = $('#first-login');
         var $input = $('#first-username-input');
