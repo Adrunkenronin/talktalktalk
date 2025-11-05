@@ -2188,7 +2188,10 @@ function ready() {
             applyDarkMode(chessSettings.darkMode);
             updateSettingUI('dark-mode');
         }
-        saveUserSettings($('#username').text());
+        var username = $('#username').text().trim();
+        if (username && username !== 'user') {
+            saveUserSettings(username);
+        }
     });
 
     // Board and Pieces modal handlers
