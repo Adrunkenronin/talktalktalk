@@ -1055,11 +1055,13 @@ function saveUserSettings(username) {
 }
 
 function loadUserSettings(username) {
-    if (!username) return;
+    if (!username || username === 'user') return;
     var apiUrl = API_BASE + '/api/settings/' + encodeURIComponent(username);
+    console.log('Loading settings for user:', username);
     fetch(apiUrl)
         .then(function(response) { return response.json(); })
         .then(function(data) {
+            console.log('Loaded settings data for', username, ':', data);
             if (data && typeof data === 'object') {
                 if (typeof data.confirmMoves === 'boolean') {
                     chessSettings.confirmMoves = data.confirmMoves;
@@ -1075,9 +1077,11 @@ function loadUserSettings(username) {
                     updateSettingUI('dark-mode');
                 }
                 if (typeof data.selectedBoard === 'string') {
+                    console.log('Setting board to:', data.selectedBoard);
                     boardPiecesSettings.selectedBoard = data.selectedBoard;
                 }
                 if (typeof data.selectedPieces === 'string') {
+                    console.log('Setting pieces to:', data.selectedPieces);
                     boardPiecesSettings.selectedPieces = data.selectedPieces;
                 }
                 if (boardPiecesSettings.boardsData && boardPiecesSettings.piecesData) {
