@@ -1031,7 +1031,7 @@ function applyDarkMode(isDark) {
 }
 
 function saveUserSettings(username) {
-    if (!username) return;
+    if (!username || username === 'user') return;
     var apiUrl = API_BASE + '/api/settings/' + encodeURIComponent(username);
     var settings = {
         confirmMoves: chessSettings.confirmMoves,
@@ -1040,10 +1040,14 @@ function saveUserSettings(username) {
         selectedBoard: boardPiecesSettings.selectedBoard,
         selectedPieces: boardPiecesSettings.selectedPieces
     };
+    console.log('Saving settings for user:', username, settings);
     fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
+    })
+    .then(function(response) {
+        console.log('Settings saved successfully for', username);
     })
     .catch(function(error) {
         console.warn('Failed to save user settings:', error);
